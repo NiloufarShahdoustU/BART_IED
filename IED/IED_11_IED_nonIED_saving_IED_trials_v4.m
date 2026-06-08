@@ -1,0 +1,124 @@
+% In this code I am using the newest version of IED detection code:
+% which is detectIEDs_single_array_v4.m
+
+clear;
+clc;
+close all;
+warning('off','all');
+
+%% loading neural and event data
+ 
+% getting the numbers of different patients
+
+inputFolderName_bhvStruct = '\\155.100.91.44\d\Data\Nill\BART\bhvStruct_Nill_made';
+inputFolderName_LFPmat = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed\LFPmat_bad_chans_removed';
+fileList = dir(fullfile(inputFolderName_bhvStruct, '*.bhvStruct.mat'));
+outputFolderName = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed\IEDdata_bad_chans_removed_v2\'; 
+outputIEDTrials = '\\155.100.91.44\d\Data\Nill\BART\bad_chans_removed\IEDTrials_bad_chans_removed_v2\';
+PatientsNum = length(fileList);
+Fnew = 500;
+
+%%
+
+for pt = 1:PatientsNum
+% for pt = 1:1
+    fileNameParts = strsplit(fileList(pt).name, '.');
+    patientID = fileNameParts{1}; 
+    disp(' ');
+    disp(['Processing patient ID: ' patientID ' (' int2str(pt) '/' int2str(PatientsNum) ')']);
+    ptID = patientID;
+
+    matFile_bhvStruct = [inputFolderName_bhvStruct '\' ptID '.bhvStruct.mat'];
+    load(matFile_bhvStruct);
+
+    matFile_bhvStruct = [inputFolderName_LFPmat '\' ptID '.LFPmat.mat'];
+    load(matFile_bhvStruct);
+
+    ReactionTimes = bhvStruct.allRTs;
+    % here I take popped trials first and then change 0s and 1s.
+    poppedTrials = bhvStruct.poppedTrials;
+    BankedTrials = ~poppedTrials;
+    ReactTimeThreshold = 10;
+    OutlierIndices = ReactionTimes >= ReactTimeThreshold;
+    % ReactionTimesFiltered = ReactionTimes(~OutlierIndices);
+    ReactionTimesFiltered = ReactionTimes; % I want to have all the RTs
+    poppedTrials = poppedTrials(~OutlierIndices);
+    BankedTrials = BankedTrials(~OutlierIndices);
+
+
+    LFPmat = LFPmatStruct_new.LFPmat;
+    % LFPmatNew = LFPmat(:, :, ~OutlierIndices);
+
+
+    start_channel = 1;
+    end_channel = size(LFPmat,1)-1;
+    nTrials = length(ReactionTimesFiltered);
+    nChans = length(LFPmatStruct_new.selectedChans);
+    IEDtrials = nan(nChans-1, nTrials); 
+    for chz = start_channel:end_channel
+        IEDtrials(chz, :) = outliers(range(squeeze(LFPmat(chz,:,:))));
+    end
+
+
+
+    LFP_IED_trials = nan(size(LFPmat));
+    for chz = start_channel:end_channel
+        for trial = 1:nTrials
+            if IEDtrials(chz, trial) == 1
+                LFP_IED_trials(chz, :, trial) = LFPmat(chz, :, trial);
+            end
+        end
+    end
+
+
+
+    IED_timepoints = nan(size(LFP_IED_trials));
+    for chz = start_channel:end_channel
+        for trial = 1:nTrials
+            if IEDtrials(chz, trial) == 1
+                mySig = squeeze(LFP_IED_trials(chz,:,trial));
+                IEDStruct = detectIEDs_single_array_v4(mySig,Fnew);
+                IEDsInices = IEDStruct.foundPeaks.locs;
+                IED_timepoints(chz,IEDsInices,trial) = 1;
+            end
+        end
+    end
+
+    % now let's modify IEDtrials:
+    for chz = start_channel:end_channel
+        for trial = 1:nTrials
+            if any(squeeze(IED_timepoints(chz,:,trial))==1)
+                IEDtrials(chz, trial) = 1;
+            else 
+                IEDtrials(chz, trial) = 0;
+            end
+        end
+    end
+
+
+
+
+
+    IEDdata.selectedChans = LFPmatStruct_new.selectedChans;
+    IEDdata.IED_timepoints = IED_timepoints;
+    IEDdata.anatomicalLocs = LFPmatStruct_new.anatomicalLocs; 
+    IEDdata.IEDtrials = IEDtrials;
+    IEDdata.RTs = bhvStruct.allRTs;
+    IEDdata.ITs = bhvStruct.allITs;
+
+% I also wanna change IED trials in another folder for each patient
+
+    IEDTrialsInfo.IEDtrials = IEDtrials;
+    IEDTrialsInfo.IED_timepoints = IED_timepoints;
+
+
+
+    save([outputIEDTrials ptID '.IEDtrials.mat'],'IEDTrialsInfo');
+
+    save([outputFolderName ptID '.IEDdata.mat'],'IEDdata');
+
+    clear NonIEDTrials_temp_vec IEDtrials_preStimRT_temp_vec IEDtrials_periStimRT_temp_vec slice pVal_preStimRT pVal_periStimRT pVal_postStimRT
+    clear LFPmat IEDtrials LFP_IED_trials mySig IED_timepoints NonIEDTrialsRTs IEDtrials_preStimRT IEDtrials_periStimRT IEDtrials_postStimRT
+    clear pVal_preStimRT_filtered pVal_periStimRT_filtered pVal_postStimRT_filtered RTSampleSize_NonIED RTSampleSize_preStim RTSampleSize_periStim RTSampleSize_postStim
+end
+
