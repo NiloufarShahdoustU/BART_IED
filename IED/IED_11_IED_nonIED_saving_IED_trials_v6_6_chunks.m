@@ -320,6 +320,7 @@ for pt = 1:length(fileList)
 
     LFPIED.RTs = data.bhvStruct.allRTs; 
     LFPIED.ITs = data.bhvStruct.allITs;
+    LFPIED.isControl = data.bhvStruct.isCtrl;
     LFPIED.poppedTrials = poppedTrials;
     LFPIED.BankedTrials = BankedTrials;
 
@@ -400,5 +401,7 @@ end
 % a_LFPmatPreOutcome = squeeze(LFPmatPreOutcome(14,:,63));
 % % % 
 
-
 % aaa = nansum(IED_timepoints(:));
+% close all;
+% aaa = squeeze(LFPIED.IED_timepointsPostOnset(2,:,:));
+% imagesc(aaa);
