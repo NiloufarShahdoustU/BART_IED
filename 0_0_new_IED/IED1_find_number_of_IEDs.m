@@ -116,7 +116,7 @@ for pt = 1:length(fileList)
     IED_timepoints = zeros(size(data2K));
     for chz = 1:nChans
         mySig = squeeze(data2K(chz,:));
-        IEDStruct = detectIEDs_single_array_v5(mySig,Fs);
+        IEDStruct = detectIEDs_single_array_v8(mySig,Fs);
         IEDsInices = IEDStruct.foundPeaks.locs;
         IED_timepoints(chz,IEDsInices) = 1;
         
@@ -280,3 +280,10 @@ end
 %%  debug
 
 
+trialNums = LFPIED.IED_occurance_RT(:,1);
+
+[uniqueTrials, ~, idx] = unique(trialNums);
+
+numIEDsPerTrial = accumarray(idx, 1);
+
+result = [uniqueTrials numIEDsPerTrial];
