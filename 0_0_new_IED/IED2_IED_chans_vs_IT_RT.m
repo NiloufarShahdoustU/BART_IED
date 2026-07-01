@@ -3,7 +3,9 @@
 % Only non-control trials
 % Trials with 0 IEDs / 0 IED channels are NOT shown
 % Trials with RT > 10 seconds are removed from BOTH RT and IT plots
-% Outlier x-value trials are removed before plotting/fitting
+% No outlier removal
+% Only x datapoints are log10-transformed before plotting and fitting
+% Linear fit using log10(x) and raw y
 % Fitted line with SEM band
 % Each subplot is square
 % Author: Nill
@@ -20,9 +22,6 @@ if ~exist(outputFolderName, 'dir')
 end
 
 fileList = dir(fullfile(inputFolderName_LFPIED, '*.LFPIED.mat'));
-
-removeIEDcountOutliers = true;
-outlierMethod = 'quartiles';
 
 for pt = 1:length(fileList)
 
@@ -41,6 +40,7 @@ for pt = 1:length(fileList)
     RTs = LFPIED.RTs(:);
     ITs = LFPIED.ITs(:);
     isControl = LFPIED.isControl(:);
+    nChans = length(LFPIED.selectedChans);
 
     minLen = min([nTrials, length(RTs), length(ITs), length(isControl)]);
 
@@ -58,11 +58,11 @@ for pt = 1:length(fileList)
     nIEDchans_RT = countUniqueIEDchansPerTrial(LFPIED, 'IED_occurance_RT', nTrials);
     nIEDchans_IT = countUniqueIEDchansPerTrial(LFPIED, 'IED_occurance_IT', nTrials);
 
-    keep_IED_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & nIED_RT > 0;
-    keep_IED_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & nIED_IT > 0;
+    keep_IED_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nIED_RT > 0;
+    keep_IED_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nIED_IT > 0;
 
-    keep_chans_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & nIEDchans_RT > 0;
-    keep_chans_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & nIEDchans_IT > 0;
+    keep_chans_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nIEDchans_RT > 0;
+    keep_chans_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nIEDchans_IT > 0;
 
     x_IED_RT = nIED_RT(keep_IED_RT);
     y_IED_RT = RTs(keep_IED_RT);
@@ -76,17 +76,6 @@ for pt = 1:length(fileList)
     x_chans_IT = nIEDchans_IT(keep_chans_IT);
     y_chans_IT = ITs(keep_chans_IT);
 
-    [x_IED_RT, y_IED_RT, nOut_IED_RT] = removeXOutliers(x_IED_RT, y_IED_RT, removeIEDcountOutliers, outlierMethod);
-    [x_IED_IT, y_IED_IT, nOut_IED_IT] = removeXOutliers(x_IED_IT, y_IED_IT, removeIEDcountOutliers, outlierMethod);
-
-    [x_chans_RT, y_chans_RT, nOut_chans_RT] = removeXOutliers(x_chans_RT, y_chans_RT, removeIEDcountOutliers, outlierMethod);
-    [x_chans_IT, y_chans_IT, nOut_chans_IT] = removeXOutliers(x_chans_IT, y_chans_IT, removeIEDcountOutliers, outlierMethod);
-
-    disp(['RT IED-count outliers removed: ' num2str(nOut_IED_RT)]);
-    disp(['IT IED-count outliers removed: ' num2str(nOut_IED_IT)]);
-    disp(['RT unique-channel-count outliers removed: ' num2str(nOut_chans_RT)]);
-    disp(['IT unique-channel-count outliers removed: ' num2str(nOut_chans_IT)]);
-
     fig = figure('Visible', 'off');
     set(fig, 'Position', [100 100 1100 1000]);
 
@@ -96,37 +85,39 @@ for pt = 1:length(fileList)
     plotOnePanel( ...
         x_IED_RT, ...
         y_IED_RT, ...
-        'Number of IEDs in RT window', ...
-        'RT', ...
-        ['IED count vs RT - Patient ' ptID]);
+        'log10(Number of IEDs in RT window)', ...
+        'RT (s)', ...
+        ['log10(IED count) vs RT - Patient ' ptID]);
 
     nexttile;
     plotOnePanel( ...
         x_IED_IT, ...
         y_IED_IT, ...
-        'Number of IEDs in IT window', ...
-        'IT', ...
-        ['IED count vs IT - Patient ' ptID]);
+        'log10(Number of IEDs in IT window)', ...
+        'IT (s)', ...
+        ['log10(IED count) vs IT - Patient ' ptID]);
 
     nexttile;
     plotOnePanel( ...
         x_chans_RT, ...
         y_chans_RT, ...
-        'Number of unique IED channels in RT window', ...
-        'RT', ...
-        ['Unique IED channels vs RT - Patient ' ptID]);
+        'log10(Number of unique IED channels in RT window)', ...
+        'RT (s)', ...
+        ['log10(Unique IED channels) vs RT - Patient ' ptID]);
 
     nexttile;
     plotOnePanel( ...
         x_chans_IT, ...
         y_chans_IT, ...
-        'Number of unique IED channels in IT window', ...
-        'IT', ...
-        ['Unique IED channels vs IT - Patient ' ptID]);
+        'log10(Number of unique IED channels in IT window)', ...
+        'IT (s)', ...
+        ['log10(Unique IED channels) vs IT - Patient ' ptID]);
 
-    sgtitle(['IED count and unique IED channels vs RT / IT - Patient ' ptID], 'Interpreter', 'none');
+    sgtitle(['Patient ' ptID ...
+        ' - nChans = ' num2str(nChans)], ...
+        'Interpreter', 'none');
 
-    outputPDF = fullfile(outputFolderName, [ptID '_IED_chans_vs_RT_IT.pdf']);
+    outputPDF = fullfile(outputFolderName, [ptID '_IED_chans_vs_IT_RT.pdf']);
 
     exportgraphics(fig, outputPDF, 'ContentType', 'vector');
 
@@ -197,34 +188,21 @@ function nIEDchans = countUniqueIEDchansPerTrial(LFPIED, fieldName, nTrials)
 
 end
 
-function [xClean, yClean, nOutliers] = removeXOutliers(x, y, removeOutliers, outlierMethod)
-
-    xClean = x(:);
-    yClean = y(:);
-    nOutliers = 0;
-
-    if ~removeOutliers
-        return;
-    end
-
-    if length(xClean) >= 4 && length(unique(xClean)) > 1
-
-        outlierIdx = isoutlier(xClean, outlierMethod);
-
-        nOutliers = sum(outlierIdx);
-
-        xClean = xClean(~outlierIdx);
-        yClean = yClean(~outlierIdx);
-
-    end
-
-end
-
 function plotOnePanel(x, y, xLabelText, yLabelText, titleText)
+
+    x = x(:);
+    y = y(:);
+
+    validIdx = isfinite(x) & isfinite(y) & x > 0 & y > 0;
+    x = x(validIdx);
+    y = y(validIdx);
+
+    logX = log10(x);
+    logY = y;
 
     hold on;
 
-    scatter(x, y, 18, ...
+    scatter(logX, logY, 18, ...
         'MarkerFaceColor', [0.00 0.70 0.75], ...
         'MarkerEdgeColor', 'none', ...
         'MarkerFaceAlpha', 0.5);
@@ -236,15 +214,15 @@ function plotOnePanel(x, y, xLabelText, yLabelText, titleText)
     grid off;
     box off;
 
-    if length(x) > 2 && length(unique(x)) > 1
+    if length(logX) > 2 && length(unique(logX)) > 1
 
-        [rhoVal, pVal] = corr(x, y, ...
+        [rhoVal, pVal] = corr(logX, logY, ...
             'Type', 'Spearman', ...
             'Rows', 'complete');
 
         subtitle(sprintf('Spearman rho = %.3f, p = %.4f', rhoVal, pVal));
 
-        plotFitWithSEM(x, y);
+        plotFitWithSEM(logX, logY);
 
     else
 
@@ -252,35 +230,28 @@ function plotOnePanel(x, y, xLabelText, yLabelText, titleText)
 
     end
 
-    ax = gca;
-    currentXLim = xlim(ax);
-    currentYLim = ylim(ax);
-
-    xlim(ax, [0 currentXLim(2)]);
-    ylim(ax, [0 currentYLim(2)]);
-
     pbaspect([1 1 1]);
 
     hold off;
 
 end
 
-function plotFitWithSEM(x, y)
+function plotFitWithSEM(logX, logY)
 
-    x = x(:);
-    y = y(:);
+    logX = logX(:);
+    logY = logY(:);
 
-    validIdx = isfinite(x) & isfinite(y);
-    x = x(validIdx);
-    y = y(validIdx);
+    validIdx = isfinite(logX) & isfinite(logY);
+    logX = logX(validIdx);
+    logY = logY(validIdx);
 
-    if length(x) < 3 || length(unique(x)) < 2
+    if length(logX) < 3 || length(unique(logX)) < 2
         return;
     end
 
-    mdl = fitlm(x, y);
+    mdl = fitlm(logX, logY);
 
-    xFit = linspace(min(x), max(x), 100)';
+    xFit = linspace(min(logX), max(logX), 100)';
     Xnew = [ones(length(xFit), 1), xFit];
 
     beta = mdl.Coefficients.Estimate;
