@@ -7,14 +7,14 @@
 %
 % Only non-control trials
 % Trials with RT > 10 seconds are removed from RT, IT, and BR analyses
-% Trials with 0 IEDs are excluded
-% Only x datapoints are log10-transformed
+% Trials with 0 IEDs are included
+% x datapoints are transformed as log10(IED count + 1) so zero-IED trials are included
 % RT and IT remain raw seconds
 % BR is binary: 0 = not banked, 1 = banked
 %
 % Per-patient model:
-%   RT/IT: linear model, y ~ logX
-%   BR: logistic model, BR ~ logX
+%   RT/IT: linear model, y ~ logX, where logX = log10(IED count + 1)
+%   BR: logistic model, BR ~ logX, where logX = log10(IED count + 1)
 %
 % Group mixed-effects model:
 %   RT/IT: y ~ logX + (1 | patientID)
@@ -39,11 +39,8 @@ if ~exist(summaryFolder, 'dir')
     mkdir(summaryFolder);
 end
 
-% Choose which IED epoch to use for BankedTrials / BR analysis:
-% 'RT'         = IEDs during RT predict banking
-% 'IT'         = IEDs during IT predict banking
-% 'RT_plus_IT' = total IEDs during RT + IT predict banking
-bankIEDSource = 'RT';
+% BR analysis uses only the number of IEDs occurring during IT.
+% Trials with 0 IT-period IEDs are included in the BR analysis.
 
 fileList = dir(fullfile(inputFolderName_LFPIED, '*.LFPIED.mat'));
 
@@ -92,22 +89,13 @@ for pt = 1:length(fileList)
     nIED_RT = countIEDsPerTrial(LFPIED, 'IED_occurance_RT', nTrials);
     nIED_IT = countIEDsPerTrial(LFPIED, 'IED_occurance_IT', nTrials);
 
-    if strcmpi(bankIEDSource, 'RT')
-        nIED_BR = nIED_RT;
-        xMeasureBR = 'IED count during RT';
-    elseif strcmpi(bankIEDSource, 'IT')
-        nIED_BR = nIED_IT;
-        xMeasureBR = 'IED count during IT';
-    elseif strcmpi(bankIEDSource, 'RT_plus_IT')
-        nIED_BR = nIED_RT + nIED_IT;
-        xMeasureBR = 'IED count during RT plus IT';
-    else
-        error('bankIEDSource must be RT, IT, or RT_plus_IT.');
-    end
+    % For BR, use only IED count during IT.
+    nIED_BR = nIED_IT;
+    xMeasureBR = 'IED count during IT';
 
-    keep_IED_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nIED_RT > 0;
-    keep_IED_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nIED_IT > 0;
-    keep_IED_BR = nonControlTrials & validRT_10sec & validBR & nIED_BR > 0;
+    keep_IED_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nIED_RT >= 0;
+    keep_IED_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nIED_IT >= 0;
+    keep_IED_BR = nonControlTrials & validRT_10sec & validBR & nIED_BR >= 0;
 
     panels = {
         'IED_count_vs_RT', 'IED count during RT', 'RT', nIED_RT, RTs, keep_IED_RT;
@@ -238,15 +226,15 @@ function [rawX, logX, y] = cleanPanelData(rawX, y, yMeasure)
     y = y(:);
 
     if string(yMeasure) == "BR"
-        validIdx = isfinite(rawX) & isfinite(y) & rawX > 0 & (y == 0 | y == 1);
+        validIdx = isfinite(rawX) & isfinite(y) & rawX >= 0 & (y == 0 | y == 1);
     else
-        validIdx = isfinite(rawX) & isfinite(y) & rawX > 0 & y > 0;
+        validIdx = isfinite(rawX) & isfinite(y) & rawX >= 0 & y > 0;
     end
 
     rawX = rawX(validIdx);
     y = y(validIdx);
 
-    logX = log10(rawX);
+    logX = log10(rawX + 1);
 
 end
 
@@ -637,7 +625,7 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
                 'yMeasure', ...
                 'nPatients', ...
                 'nTrialPoints', ...
-                'beta_log10X', ...
+                'beta_log10IEDplus1', ...
                 'SE', ...
                 'tStat', ...
                 'pValue', ...
@@ -730,9 +718,9 @@ function plotSummaryBoxplots(perPatientResults, summaryPDF, groupMixedEffectsRes
     comparisonOrder = unique(perPatientResults.comparison, 'stable');
 
     colors = [
-        0.10 0.45 0.70
-        0.90 0.45 0.10
-        0.25 0.60 0.25
+        0.204   0.459   0.702
+        0.847   0.333   0.153
+        0.25    0.60    0.25
     ];
 
     if length(comparisonOrder) > size(colors, 1)
@@ -747,7 +735,7 @@ function plotSummaryBoxplots(perPatientResults, summaryPDF, groupMixedEffectsRes
         comparisonOrder, ...
         colors, ...
         'modelSlope', ...
-        sprintf('Model slope\nRT/IT: seconds per log10(IED count); BR: log-odds per log10(IED count)'), ...
+        sprintf('Model slope\nRT/IT: seconds per log10(IED count + 1); BR: log-odds per log10(IED count + 1)'), ...
         'Per-patient model slope', ...
         groupMixedEffectsResults, ...
         'pValue_FDR');
