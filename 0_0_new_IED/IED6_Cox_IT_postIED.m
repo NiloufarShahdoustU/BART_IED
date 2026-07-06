@@ -1,4 +1,4 @@
-% Cox proportional hazards model for response timing during RT
+% Cox proportional hazards model for action timing during IT
 %
 % Primary time-varying predictor:
 %   activeIEDWindowCount(t) = number of individual IEDs whose 500 ms
@@ -29,11 +29,23 @@ inputFolderName_LFPIED = ...
     'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED7_Cox_RT_postIED500ms\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED6_Cox_IT_postIED\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);
 end
+
+% Save all Command Window output from this script in a text file.
+textOutputFile = fullfile( ...
+    outputFolderName, 'IT_postIED500ms_console_output.txt');
+
+% Start a fresh text output file for every run.
+diary off;
+if exist(textOutputFile, 'file')
+    delete(textOutputFile);
+end
+diary(textOutputFile);
+diaryCleanup = onCleanup(@() diary('off'));
 
 % If LFPIED.Fs exists, the saved value is used.
 % Otherwise, the sampling frequency is silently set to 1000 Hz.
@@ -69,7 +81,7 @@ for pt = 1:length(fileList)
 
     LFPIED = loadedData.LFPIED;
 
-    requiredFields = {'RTs', 'isControl', 'balloonType', 'IED_occurance_RT'};
+    requiredFields = {'RTs', 'ITs', 'isControl', 'balloonType', 'IED_occurance_IT'};
 
     missingField = false;
 
@@ -85,13 +97,15 @@ for pt = 1:length(fileList)
     end
 
     RTs = LFPIED.RTs(:);
+    ITs = LFPIED.ITs(:);
     isControl = LFPIED.isControl(:);
     balloonType = LFPIED.balloonType(:);
 
     nTrials = determineNumberOfTrials( ...
-        LFPIED, RTs, isControl, balloonType);
+        LFPIED, RTs, ITs, isControl, balloonType);
 
     RTs = RTs(1:nTrials);
+    ITs = ITs(1:nTrials);
     isControl = isControl(1:nTrials);
     balloonType = balloonType(1:nTrials);
 
@@ -100,11 +114,11 @@ for pt = 1:length(fileList)
     samplingFrequencyHz = getSamplingFrequency( ...
         LFPIED, defaultSamplingFrequencyHz);
 
-    IEDoccurrence = LFPIED.IED_occurance_RT;
+    IEDoccurrence = LFPIED.IED_occurance_IT;
 
     for trial = 1:nTrials
 
-        durationSeconds = RTs(trial);
+        durationSeconds = ITs(trial);
         finalEventObserved = true;
 
         % Include only non-control yellow, orange, and red balloon trials.
@@ -297,8 +311,8 @@ for ii = 1:length(beta)
     if ii == 1
         interpretation(ii) = ...
             "hazard ratio is per additional active ied window; hr > 1 means " + ...
-            "higher response hazard and shorter rt for each additional ied; " + ...
-            "hr < 1 means lower response hazard and longer rt.";
+            "higher action hazard and shorter it for each additional ied; " + ...
+            "hr < 1 means lower action hazard and longer it.";
     else
         interpretation(ii) = ...
             "balloon color effect relative to yellow";
@@ -339,7 +353,7 @@ coxResults = table( ...
     });
 
 fprintf('\n============================================================\n');
-fprintf('500 ms post-ied rt cox model\n');
+fprintf('500 ms post-ied it cox model\n');
 fprintf('============================================================\n');
 fprintf('post-ied window: %d ms\n', postIEDWindowMilliseconds);
 fprintf('participants: %d\n', length(patientLevels));
@@ -366,13 +380,13 @@ fprintf('p = %.6g\n', primaryRow.pValue);
 if primaryRow.pValue < 0.05
 
     if primaryRow.hazardRatio > 1
-        fprintf('conclusion: each additional active ied window is associated with a significantly higher response hazard and shorter rt.\n');
+        fprintf('conclusion: each additional active ied window is associated with a significantly higher action hazard and shorter it.\n');
     else
-        fprintf('conclusion: each additional active ied window is associated with a significantly lower response hazard and longer rt.\n');
+        fprintf('conclusion: each additional active ied window is associated with a significantly lower action hazard and longer it.\n');
     end
 
 else
-    fprintf('conclusion: the response hazard does not significantly change per additional active ied window.\n');
+    fprintf('conclusion: the action hazard does not significantly change per additional active ied window.\n');
 end
 
 %% participant-level descriptive event rates
@@ -393,26 +407,18 @@ observedIEDCounts = unique( ...
         observedIEDCounts);
 
 figurePDFOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_cox_visualization.pdf');
-
-figurePNGOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_cox_visualization.png');
+    outputFolderName, 'IT_postIED500ms_cox_visualization.pdf');
 
 modelEffectOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_model_effect.csv');
+    outputFolderName, 'IT_postIED500ms_model_effect.csv');
 
 patientRatesOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_patient_event_rates.csv');
+    outputFolderName, 'IT_postIED500ms_patient_event_rates.csv');
 
 exportgraphics( ...
     visualizationFigure, ...
     figurePDFOutputFile, ...
     'ContentType', 'vector');
-
-exportgraphics( ...
-    visualizationFigure, ...
-    figurePNGOutputFile, ...
-    'Resolution', 300);
 
 writetable(modelEffectTable, modelEffectOutputFile);
 writetable(patientEventRates, patientRatesOutputFile);
@@ -422,19 +428,19 @@ close(visualizationFigure);
 %% save numerical outputs
 
 countingProcessOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_counting_process_data.csv');
+    outputFolderName, 'IT_postIED500ms_counting_process_data.csv');
 
 trialSummaryOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_trial_summary.csv');
+    outputFolderName, 'IT_postIED500ms_trial_summary.csv');
 
 coxResultsOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_cox_results.csv');
+    outputFolderName, 'IT_postIED500ms_cox_results.csv');
 
 baselineHazardOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_baseline_cumulative_hazard.csv');
+    outputFolderName, 'IT_postIED500ms_baseline_cumulative_hazard.csv');
 
 modelOutputFile = fullfile( ...
-    outputFolderName, 'RT_postIED500ms_cox_model.mat');
+    outputFolderName, 'IT_postIED500ms_cox_model.mat');
 
 writetable(countingProcessData, countingProcessOutputFile);
 writetable(trialSummary, trialSummaryOutputFile);
@@ -473,15 +479,20 @@ fprintf('%s\n', patientRatesOutputFile);
 fprintf('%s\n', modelEffectOutputFile);
 fprintf('%s\n', modelOutputFile);
 fprintf('%s\n', figurePDFOutputFile);
-fprintf('%s\n', figurePNGOutputFile);
+fprintf('%s\n', textOutputFile);
+
+% Stop writing to the text file now that all output has been printed.
+diary off;
+clear diaryCleanup;
 
 %% local functions
 
 function nTrials = determineNumberOfTrials( ...
-    LFPIED, RTs, isControl, balloonType)
+    LFPIED, RTs, ITs, isControl, balloonType)
 
     vectorLengths = [ ...
         length(RTs), ...
+        length(ITs), ...
         length(isControl), ...
         length(balloonType) ...
     ];
@@ -817,14 +828,14 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
     postIEDWindowMilliseconds, ...
     observedIEDCounts)
 
-    colorRT = [0.204  0.459  0.702];   % requested color
-    lightColor = 0.75 .* [1 1 1] + 0.25 .* colorRT;
+    colorIT = [0.847  0.333  0.153];   % requested color
+    lightColor = 0.75 .* [1 1 1] + 0.25 .* colorIT;
 
     fig = figure('Visible', 'off');
-    set(fig, 'Position', [100 100 1650 520]);
+    set(fig, 'Position', [100 100 1150 520]);
     set(fig, 'Color', 'w');
 
-    tiledlayout(1, 3, ...
+    tiledlayout(1, 2, ...
         'Padding', 'compact', ...
         'TileSpacing', 'compact');
 
@@ -849,13 +860,13 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
         'o', ...
         'LineWidth', 1.2, ...
         'MarkerSize', 6, ...
-        'MarkerFaceColor', colorRT, ...
-        'MarkerEdgeColor', colorRT, ...
-        'Color', colorRT, ...
+        'MarkerFaceColor', colorIT, ...
+        'MarkerEdgeColor', colorIT, ...
+        'Color', colorIT, ...
         'CapSize', 7);
 
     xline(1, '--', ...
-        'Color', colorRT, ...
+        'Color', colorIT, ...
         'LineWidth', 1);
 
     predictorLabels = [ ...
@@ -881,8 +892,41 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
         coxResults.hazardRatioCILow, ...
         coxResults.hazardRatioCIHigh);
 
+    % Add one asterisk beside estimates that are significant according to
+    % the participant-clustered robust Wald test (p < 0.05).
+    significantRows = ...
+        isfinite(coxResults.pValue) & ...
+        coxResults.pValue < 0.05 & ...
+        isfinite(coxResults.hazardRatioCIHigh) & ...
+        coxResults.hazardRatioCIHigh > 0;
+
+    significanceX = NaN(nPredictors, 1);
+    significanceX(significantRows) = ...
+        1.10 .* coxResults.hazardRatioCIHigh(significantRows);
+
+    % Leave enough room on the logarithmic x-axis for the asterisks.
+    if any(significantRows)
+        xLimits(2) = max( ...
+            xLimits(2), ...
+            1.15 .* max(significanceX(significantRows)));
+    end
+
     xlim(xLimits);
     ylim([0.5, nPredictors + 0.5]);
+
+    for ii = 1:nPredictors
+        if significantRows(ii)
+            text( ...
+                significanceX(ii), ...
+                yPositions(ii), ...
+                '*', ...
+                'Color', 'k', ...
+                'FontSize', 16, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'left', ...
+                'VerticalAlignment', 'middle');
+        end
+    end
 
     grid off;
     box off;
@@ -928,7 +972,7 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
         relativeHazard, ...
         '-', ...
         'LineWidth', 2.2, ...
-        'Color', colorRT);
+        'Color', colorIT);
 
     % Put markers only at a small set of representative observed counts.
     % The same values are used as x-axis ticks.
@@ -941,8 +985,8 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
         'o', ...
         'LineStyle', 'none', ...
         'MarkerSize', 6, ...
-        'MarkerFaceColor', colorRT, ...
-        'MarkerEdgeColor', colorRT);
+        'MarkerFaceColor', colorIT, ...
+        'MarkerEdgeColor', colorIT);
 
     xMinimum = min(exposureState);
     xMaximum = max(exposureState);
@@ -966,7 +1010,7 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
         'TickDir', 'out');
 
     xlabel('number of simultaneously active ied windows', 'Color', 'k');
-    ylabel('relative response hazard vs 0 active ieds', 'Color', 'k');
+    ylabel('relative action hazard vs 0 active ieds', 'Color', 'k');
     title('adjusted ied-count effect', 'Color', 'k');
     subtitle('line = estimate; shaded band = robust 95% ci');
 
@@ -996,83 +1040,6 @@ function [fig, modelEffectTable] = plotPostIEDVisualization( ...
         'BackgroundColor', 'w', ...
         'EdgeColor', [0.80 0.80 0.80], ...
         'Margin', 5);
-
-    grid off;
-    box off;
-    hold off;
-
-    %% panel 3: paired participant-level descriptive rates
-
-    nexttile;
-    hold on;
-
-    validParticipants = ...
-        isfinite(patientEventRates.outsideWindowRate_per100s) & ...
-        isfinite(patientEventRates.postIEDWindowRate_per100s);
-
-    outsideRates = ...
-        patientEventRates.outsideWindowRate_per100s(validParticipants);
-
-    insideRates = ...
-        patientEventRates.postIEDWindowRate_per100s(validParticipants);
-
-    for pp = 1:length(outsideRates)
-
-        plot( ...
-            [1 2], ...
-            [outsideRates(pp), insideRates(pp)], ...
-            '-o', ...
-            'LineWidth', 0.75, ...
-            'MarkerSize', 3.5, ...
-            'Color', lightColor, ...
-            'MarkerFaceColor', lightColor, ...
-            'MarkerEdgeColor', lightColor);
-
-    end
-
-    medianOutside = median(outsideRates, 'omitnan');
-    medianInside = median(insideRates, 'omitnan');
-
-    plot( ...
-        [1 2], ...
-        [medianOutside medianInside], ...
-        '-s', ...
-        'LineWidth', 2.2, ...
-        'MarkerSize', 8, ...
-        'Color', colorRT, ...
-        'MarkerFaceColor', colorRT, ...
-        'MarkerEdgeColor', colorRT);
-
-    xlim([0.75 2.25]);
-    xticks([1 2]);
-    xticklabels({ ...
-        'outside post-ied window', ...
-        'within 500 ms after ied' ...
-    });
-
-    ylabel('responses per 100 s at risk', 'Color', 'k');
-    title('participant-level event rates', 'Color', 'k');
-    subtitle('unadjusted paired descriptive rates');
-
-    set(gca, ...
-        'FontSize', 10, ...
-        'FontName', 'Arial', ...
-        'XColor', 'k', ...
-        'YColor', 'k');
-
-    yValues = [outsideRates; insideRates];
-
-    if isempty(yValues) || all(~isfinite(yValues))
-        ylim([0 1]);
-    else
-        yMaximum = max(yValues(isfinite(yValues)));
-
-        if yMaximum <= 0
-            ylim([0 1]);
-        else
-            ylim([0, 1.08 .* yMaximum]);
-        end
-    end
 
     grid off;
     box off;
