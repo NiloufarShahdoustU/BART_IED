@@ -1,4 +1,23 @@
-% Summarize where RT- and IT-period IEDs occur anatomically.
+% Summarize where RT- and IT-period IEDs occur anatomically, but plot
+% only anatomical areas that are FDR-significant in the combined IED8
+% area-specific Cox analysis.
+%
+% IMPORTANT
+% ---------
+% Run IED8_Cox_IT_RT_BR_postIED_by_brain_area.m first. This script reads:
+%   IT_brain_area_cox_results.csv
+%   RT_brain_area_cox_results.csv
+%   BR_brain_area_cox_results.csv
+%
+% An anatomical area is included in the figure when significantFDR is true
+% in at least one of the IT, RT, or BR IED8 result tables. The plotted bars
+% retain the IED7 definition:
+%   - RT-period IED events per implanted channel
+%   - IT-period IED events per implanted channel
+%
+% The BR model in IED8 uses IT-period IEDs. Therefore, an area significant
+% only for BR is still shown with its RT and IT descriptive IED counts in
+% this IED7-style grouped bar figure.
 %
 % IMPORTANT CHANNEL MAPPING
 % -------------------------
@@ -10,10 +29,7 @@
 %   originalChannelIndex = LFPIED.selectedChans(localChannelIndex);
 %   anatomicalArea       = LFPIED.anatomicalLocs(originalChannelIndex);
 %
-% If anatomicalLocs was already saved only for selected channels, this
-% script detects that situation and maps the labels directly.
-%
-% Default filtering matches the behavioral analyses:
+% Default IED7 filtering is retained:
 %   - only non-control trials
 %   - trials with RT > 10 s are excluded from both RT and IT
 %   - RT must be finite and > 0
@@ -24,10 +40,11 @@
 %   2) per_patient_brain_area_summary.csv
 %   3) group_brain_area_summary.csv
 %   4) channel_coverage_by_brain_area.csv
-%   5) brain_area_IED_distribution.pdf (single normalized panel)
+%   5) IED8_significant_area_membership.csv
+%   6) brain_area_IED_distribution_IED8_significant_areas.pdf
 %
-% The CSV summaries include raw and normalized counts. The PDF shows only
-% IEDs per implanted channel because raw counts depend on electrode coverage.
+% The PDF is a single grouped bar panel and contains only the union of
+% FDR-significant brain areas from the IT, RT, and BR IED8 analyses.
 %
 % Author: Nill
 
@@ -41,7 +58,11 @@ inputFolderName_LFPIED = ...
     'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED7_brain_area_IED_summary\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_brain_area_IED_summary\';
+
+% Folder containing the CSV outputs created by the combined IED8 code.
+ied8OutputFolderName = ...
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED7_Cox_IT_RT_BR_postIED_by_brain_area\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);
@@ -49,7 +70,6 @@ end
 
 maximumRTSeconds = 10;
 useOnlyNonControlTrials = true;
-maximumNumberOfAreasInFigure = 20;
 
 % Combine homologous left- and right-hemisphere labels into one area.
 % Examples:
@@ -295,25 +315,51 @@ writetable(perPatientSummary, perPatientOutputFile);
 writetable(groupSummary, groupOutputFile);
 writetable(coverageTable, coverageOutputFile);
 
-%% Plot group distribution
+%% Read IED8 results and identify the significant-area union
+
+ITResultsFile = fullfile( ...
+    ied8OutputFolderName, 'IT_brain_area_cox_results.csv');
+
+RTResultsFile = fullfile( ...
+    ied8OutputFolderName, 'RT_brain_area_cox_results.csv');
+
+BRResultsFile = fullfile( ...
+    ied8OutputFolderName, 'BR_brain_area_cox_results.csv');
+
+[significantAreas, significantAreaMembership] = ...
+    getIED8SignificantAreaUnion( ...
+        ITResultsFile, RTResultsFile, BRResultsFile, ...
+        combineLeftAndRight);
+
+membershipOutputFile = fullfile( ...
+    outputFolderName, 'IED8_significant_area_membership.csv');
+
+writetable(significantAreaMembership, membershipOutputFile);
+
+%% Plot only the IED8 FDR-significant anatomical areas
 
 figureOutputFile = fullfile( ...
-    outputFolderName, 'brain_area_IED_distribution.pdf');
+    outputFolderName, ...
+    'brain_area_IED_distribution_IED8_significant_areas.pdf');
 
-plotBrainAreaSummary( ...
+plotBrainAreaSummaryForSelectedAreas( ...
     groupSummary, ...
+    significantAreas, ...
+    significantAreaMembership, ...
     figureOutputFile, ...
-    maximumNumberOfAreasInFigure, ...
     colorRT, ...
     colorIT);
 
 %% Display completion information
 
 fprintf('\nBrain-area summary finished.\n');
+fprintf('IED8 FDR-significant areas in union: %d\n', ...
+    length(significantAreas));
 fprintf('Saved: %s\n', allEventsOutputFile);
 fprintf('Saved: %s\n', perPatientOutputFile);
 fprintf('Saved: %s\n', groupOutputFile);
 fprintf('Saved: %s\n', coverageOutputFile);
+fprintf('Saved: %s\n', membershipOutputFile);
 fprintf('Saved: %s\n', figureOutputFile);
 
 %% Local functions
@@ -611,29 +657,196 @@ function groupSummary = makeGroupSummary(perPatientSummary)
 
 end
 
-function plotBrainAreaSummary( ...
-    groupSummary, outputPDF, maximumNumberOfAreas, colorRT, colorIT)
+function [significantAreas, membershipTable] = ...
+    getIED8SignificantAreaUnion( ...
+        ITResultsFile, RTResultsFile, BRResultsFile, ...
+        combineLeftAndRight)
+
+    ITAreas = readIED8SignificantAreas( ...
+        ITResultsFile, combineLeftAndRight, "IT");
+
+    RTAreas = readIED8SignificantAreas( ...
+        RTResultsFile, combineLeftAndRight, "RT");
+
+    BRAreas = readIED8SignificantAreas( ...
+        BRResultsFile, combineLeftAndRight, "BR");
+
+    significantAreas = unique( ...
+        [ITAreas; RTAreas; BRAreas], 'stable');
+
+    significantAreas = significantAreas( ...
+        ~isExcludedAreaLabel(significantAreas));
+
+    significantAreas = significantAreas( ...
+        significantAreas ~= "Unknown" & ...
+        strlength(strip(significantAreas)) > 0);
+
+    if isempty(significantAreas)
+        error([ ...
+            'No FDR-significant anatomical areas were found in the ' ...
+            'IED8 IT, RT, or BR result files.']);
+    end
+
+    nAreas = length(significantAreas);
+
+    membershipTable = table( ...
+        significantAreas, ...
+        ismember(significantAreas, ITAreas), ...
+        ismember(significantAreas, RTAreas), ...
+        ismember(significantAreas, BRAreas), ...
+        strings(nAreas, 1), ...
+        'VariableNames', { ...
+            'anatomicalArea', ...
+            'significantIT', ...
+            'significantRT', ...
+            'significantBR', ...
+            'significantIn'});
+
+    for aa = 1:nAreas
+        labels = strings(0, 1);
+
+        if membershipTable.significantIT(aa)
+            labels(end + 1, 1) = "IT"; %#ok<AGROW>
+        end
+
+        if membershipTable.significantRT(aa)
+            labels(end + 1, 1) = "RT"; %#ok<AGROW>
+        end
+
+        if membershipTable.significantBR(aa)
+            labels(end + 1, 1) = "BR"; %#ok<AGROW>
+        end
+
+        membershipTable.significantIn(aa) = strjoin(labels, ", ");
+    end
+
+    fprintf('\nIED8 FDR-significant areas:\n');
+    disp(membershipTable);
+
+end
+
+function significantAreas = readIED8SignificantAreas( ...
+    resultsFile, combineLeftAndRight, analysisLabel)
+
+    if ~isfile(resultsFile)
+        error([ ...
+            'IED8 result file was not found:\n%s\n' ...
+            'Run IED8_Cox_IT_RT_BR_postIED_by_brain_area.m first, ' ...
+            'or correct ied8OutputFolderName.'], resultsFile);
+    end
+
+    results = readtable(resultsFile, 'TextType', 'string');
+
+    requiredVariables = {'anatomicalArea', 'significantFDR'};
+
+    for vv = 1:length(requiredVariables)
+        if ~ismember(requiredVariables{vv}, ...
+                results.Properties.VariableNames)
+            error('Missing variable %s in %s.', ...
+                requiredVariables{vv}, resultsFile);
+        end
+    end
+
+    results.anatomicalArea = cleanAreaLabels( ...
+        results.anatomicalArea, combineLeftAndRight);
+
+    significantRows = convertToLogical( ...
+        results.significantFDR);
+
+    if ismember('status', results.Properties.VariableNames)
+        significantRows = significantRows & ...
+            lower(strip(string(results.status))) == "fitted";
+    end
+
+    significantRows = significantRows & ...
+        ~isExcludedAreaLabel(results.anatomicalArea) & ...
+        results.anatomicalArea ~= "Unknown";
+
+    significantAreas = unique( ...
+        results.anatomicalArea(significantRows), 'stable');
+
+    fprintf('%s FDR-significant areas loaded: %d\n', ...
+        analysisLabel, length(significantAreas));
+
+end
+
+function logicalValues = convertToLogical(values)
+
+    if islogical(values)
+        logicalValues = values;
+
+    elseif isnumeric(values)
+        logicalValues = isfinite(values) & values ~= 0;
+
+    else
+        normalizedValues = lower(strip(string(values)));
+        logicalValues = ismember( ...
+            normalizedValues, ["true", "1", "yes"]);
+    end
+
+    logicalValues = logicalValues(:);
+
+end
+
+function excludedRows = isExcludedAreaLabel(labels)
+
+    normalizedLabels = lower(strip(string(labels)));
+    normalizedLabels = regexprep(normalizedLabels, '[_\-]+', ' ');
+    normalizedLabels = regexprep(normalizedLabels, '\s+', ' ');
+
+    % Remove every NaC/nucleus-accumbens label, including NaC60.
+    isNaC = ...
+        contains(normalizedLabels, "nac") | ...
+        contains(normalizedLabels, "nucleus accumbens") | ...
+        contains(normalizedLabels, "accumbens");
+
+    % Remove white-matter labels, including WM, WM60, and white_matter.
+    compactLabels = regexprep(normalizedLabels, '[^a-z0-9]', '');
+
+    isWhiteMatter = ...
+        contains(normalizedLabels, "white matter") | ...
+        contains(compactLabels, "whitematter") | ...
+        startsWith(compactLabels, "wm");
+
+    excludedRows = isNaC | isWhiteMatter;
+
+end
+
+function plotBrainAreaSummaryForSelectedAreas( ...
+    groupSummary, selectedAreas, membershipTable, ...
+    outputPDF, colorRT, colorIT)
 
     if isempty(groupSummary)
         warning('Group summary is empty. Figure was not created.');
         return;
     end
 
-    areas = unique(groupSummary.anatomicalArea, 'stable');
+    selectedAreas = string(selectedAreas(:));
 
-    totalAcrossPhases = zeros(length(areas), 1);
+    availableAreas = unique( ...
+        string(groupSummary.anatomicalArea), 'stable');
 
-    for aa = 1:length(areas)
-        rows = groupSummary.anatomicalArea == areas(aa);
-        totalAcrossPhases(aa) = sum(groupSummary.nIEDs(rows));
+    missingAreas = selectedAreas(~ismember(selectedAreas, availableAreas));
+
+    if ~isempty(missingAreas)
+        warning([ ...
+            'These IED8-significant areas were not found in the IED7 ' ...
+            'group summary and will not be plotted: %s'], ...
+            strjoin(missingAreas, ', '));
     end
 
-    [~, sortIdx] = sort(totalAcrossPhases, 'descend');
-    sortIdx = sortIdx(1:min(maximumNumberOfAreas, length(sortIdx)));
-    selectedAreas = areas(sortIdx);
+    selectedAreas = selectedAreas( ...
+        ismember(selectedAreas, availableAreas));
+
+    if isempty(selectedAreas)
+        error([ ...
+            'None of the IED8-significant areas were found in the ' ...
+            'IED7 group summary. Check that both scripts use the same ' ...
+            'input data and anatomical-label cleaning rules.']);
+    end
 
     nAreas = length(selectedAreas);
-    counts = zeros(nAreas, 2);
+    rawCounts = zeros(nAreas, 2);
     normalizedCounts = zeros(nAreas, 2);
 
     for aa = 1:nAreas
@@ -650,20 +863,40 @@ function plotBrainAreaSummary( ...
                 groupSummary.phase == phase;
 
             if any(row)
-                counts(aa, pp) = groupSummary.nIEDs(find(row, 1));
+                rowIndex = find(row, 1);
+                rawCounts(aa, pp) = ...
+                    groupSummary.nIEDs(rowIndex);
                 normalizedCounts(aa, pp) = ...
-                    groupSummary.IEDsPerCoveredChannel(find(row, 1));
+                    groupSummary.IEDsPerCoveredChannel(rowIndex);
             end
         end
     end
 
-    % Single coverage-normalized panel.
-    % Anatomical areas are shown on the x-axis and normalized IED counts
-    % are shown on the y-axis. Areas remain ordered from highest to lowest
-    % total raw IED count across RT and IT.
+    % Preserve the original IED7 ordering rule: descending total raw IEDs
+    % across RT and IT, now applied only to IED8-significant areas.
+    [~, sortIndex] = sort(sum(rawCounts, 2), 'descend');
 
-    fig = figure('Visible', 'off');
-    set(fig, 'Position', [100 100 1550 850]);
+    selectedAreas = selectedAreas(sortIndex);
+    rawCounts = rawCounts(sortIndex, :); %#ok<NASGU>
+    normalizedCounts = normalizedCounts(sortIndex, :);
+
+    membershipRows = ismember( ...
+        membershipTable.anatomicalArea, selectedAreas);
+    membershipForPlot = membershipTable(membershipRows, :);
+
+    [~, membershipOrder] = ismember( ...
+        selectedAreas, membershipForPlot.anatomicalArea);
+    membershipForPlot = membershipForPlot(membershipOrder, :);
+
+    % Keep the anatomical labels clean while showing the IED8 source in a
+    % second line under each area name.
+    xTickLabels = selectedAreas + newline + ...
+        "[" + membershipForPlot.significantIn + "]";
+
+    figureWidth = max(1200, 145 * nAreas);
+
+    fig = figure('Visible', 'off', 'Color', 'w');
+    set(fig, 'Position', [100 100 figureWidth 850]);
 
     b = bar(normalizedCounts, 'grouped');
     b(1).FaceColor = colorRT;
@@ -675,7 +908,7 @@ function plotBrainAreaSummary( ...
 
     ax = gca;
     ax.XTick = 1:nAreas;
-    ax.XTickLabel = selectedAreas;
+    ax.XTickLabel = xTickLabels;
     ax.XTickLabelRotation = 45;
     ax.TickLabelInterpreter = 'none';
     ax.FontSize = 10;
@@ -683,9 +916,9 @@ function plotBrainAreaSummary( ...
     ax.TickLength = [0.015 0.015];
     ax.Layer = 'top';
 
-    xlabel('Anatomical area');
+    xlabel('Anatomical area [IED8 significant analysis]');
     ylabel('IED events per implanted channel');
-    title('Coverage-normalized IED distribution by brain area');
+    title('IED distribution in FDR-significant brain areas from IED8');
     legend({'RT', 'IT'}, 'Location', 'best');
 
     xlim([0.5, nAreas + 0.5]);
@@ -694,6 +927,7 @@ function plotBrainAreaSummary( ...
     if ~isfinite(maximumY) || maximumY <= 0
         maximumY = 1;
     end
+
     ylim([0, maximumY * 1.10]);
     box off;
     grid off;
