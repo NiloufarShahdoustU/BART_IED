@@ -84,7 +84,7 @@ for pt = 1:length(fileList)
     nonControlTrials = isControl == 0;
 
     % RT > 10 seconds is excluded from both RT and IT analyses
-    validRT_10sec = isfinite(RTs) & RTs <= 10;
+    validRT_10sec = isfinite(RTs) & RTs <= 20;
 
     % Valid trials for RT analysis
     validTrials_RT = ...

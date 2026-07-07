@@ -55,7 +55,7 @@ defaultSamplingFrequencyHz = 1000;
 postIEDWindowMilliseconds = 500;
 postIEDWindowSeconds = postIEDWindowMilliseconds / 1000;
 
-maximumRTSeconds = 10;
+maximumRTSeconds = 20;
 
 fileList = dir(fullfile(inputFolderName_LFPIED, '*.LFPIED.mat'));
 

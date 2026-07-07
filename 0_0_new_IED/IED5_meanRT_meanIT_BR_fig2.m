@@ -78,7 +78,7 @@ for pt = 1:length(fileList)
     controlTrials = isControl == 0;
 
     % Remove trials with RT > 10 seconds from ALL calculations
-    validRT_10sec = isfinite(RTs) & RTs > 0 & RTs <= 10;
+    validRT_10sec = isfinite(RTs) & RTs > 0 & RTs <= 20;
 
     % Valid trials
     validTrials_RT = controlTrials & validRT_10sec;

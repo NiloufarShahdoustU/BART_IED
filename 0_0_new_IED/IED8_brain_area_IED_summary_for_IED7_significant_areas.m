@@ -848,6 +848,7 @@ function plotBrainAreaSummaryForSelectedAreas( ...
     nAreas = length(selectedAreas);
     rawCounts = zeros(nAreas, 2);
     normalizedCounts = zeros(nAreas, 2);
+    participantCounts = zeros(nAreas, 2);
 
     for aa = 1:nAreas
         for pp = 1:2
@@ -864,10 +865,18 @@ function plotBrainAreaSummaryForSelectedAreas( ...
 
             if any(row)
                 rowIndex = find(row, 1);
+
                 rawCounts(aa, pp) = ...
                     groupSummary.nIEDs(rowIndex);
+
                 normalizedCounts(aa, pp) = ...
                     groupSummary.IEDsPerCoveredChannel(rowIndex);
+
+                % Number of participants who had at least one implanted
+                % channel covering this anatomical area. These are the
+                % participants contributing to the bar denominator.
+                participantCounts(aa, pp) = ...
+                    groupSummary.nParticipantsWithCoverage(rowIndex);
             end
         end
     end
@@ -879,24 +888,23 @@ function plotBrainAreaSummaryForSelectedAreas( ...
     selectedAreas = selectedAreas(sortIndex);
     rawCounts = rawCounts(sortIndex, :); %#ok<NASGU>
     normalizedCounts = normalizedCounts(sortIndex, :);
+    participantCounts = participantCounts(sortIndex, :);
 
+    % Keep membership information aligned with the plotted order. It is
+    % saved in the CSV, but it is intentionally not added as a second line
+    % to the x-axis labels because MATLAB was treating those second lines
+    % as extra tick labels in the exported PDF.
     membershipRows = ismember( ...
         membershipTable.anatomicalArea, selectedAreas);
-    membershipForPlot = membershipTable(membershipRows, :);
+    membershipForPlot = membershipTable(membershipRows, :); %#ok<NASGU>
 
-    [~, membershipOrder] = ismember( ...
-        selectedAreas, membershipForPlot.anatomicalArea);
-    membershipForPlot = membershipForPlot(membershipOrder, :);
+    % Clean x-axis: one anatomical area per tick.
+    xTickLabels = cellstr(selectedAreas);
 
-    % Keep the anatomical labels clean while showing the IED8 source in a
-    % second line under each area name.
-    xTickLabels = selectedAreas + newline + ...
-        "[" + membershipForPlot.significantIn + "]";
-
-    figureWidth = max(1200, 145 * nAreas);
+    figureWidth = max(1100, 170 * nAreas);
 
     fig = figure('Visible', 'off', 'Color', 'w');
-    set(fig, 'Position', [100 100 figureWidth 850]);
+    set(fig, 'Position', [100 100 figureWidth 820]);
 
     b = bar(normalizedCounts, 'grouped');
     b(1).FaceColor = colorRT;
@@ -909,17 +917,17 @@ function plotBrainAreaSummaryForSelectedAreas( ...
     ax = gca;
     ax.XTick = 1:nAreas;
     ax.XTickLabel = xTickLabels;
-    ax.XTickLabelRotation = 45;
+    ax.XTickLabelRotation = 35;
     ax.TickLabelInterpreter = 'none';
-    ax.FontSize = 10;
+    ax.FontSize = 11;
     ax.TickDir = 'out';
     ax.TickLength = [0.015 0.015];
     ax.Layer = 'top';
 
-    xlabel('Anatomical area [IED8 significant analysis]');
+    xlabel('Anatomical area');
     ylabel('IED events per implanted channel');
-    title('IED distribution in FDR-significant brain areas from IED8');
-    legend({'RT', 'IT'}, 'Location', 'best');
+    title('IED distribution in IED8 FDR-significant brain areas');
+    legend({'RT', 'IT'}, 'Location', 'northeast', 'Box', 'off');
 
     xlim([0.5, nAreas + 0.5]);
 
@@ -928,7 +936,30 @@ function plotBrainAreaSummaryForSelectedAreas( ...
         maximumY = 1;
     end
 
-    ylim([0, maximumY * 1.10]);
+    % Leave room above the bars for participant-count labels.
+    labelOffset = 0.025 * maximumY;
+    ylim([0, maximumY * 1.18]);
+
+    % Write participant counts above every RT and IT bar.
+    % n = number of participants with channel coverage in that area.
+    drawnow;
+
+    for pp = 1:2
+        xPositions = b(pp).XEndPoints;
+        yPositions = b(pp).YEndPoints;
+        countLabels = compose('n=%d', participantCounts(:, pp));
+
+        text( ...
+            xPositions(:), ...
+            yPositions(:) + labelOffset, ...
+            countLabels(:), ...
+            'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'bottom', ...
+            'FontSize', 9, ...
+            'Color', [0.15 0.15 0.15], ...
+            'Interpreter', 'none');
+    end
+
     box off;
     grid off;
 

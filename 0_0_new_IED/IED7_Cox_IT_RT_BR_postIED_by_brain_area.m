@@ -42,10 +42,10 @@ end
 
 %% Shared settings
 
-settings.postIEDWindowMilliseconds = 1000;
+settings.postIEDWindowMilliseconds = 500;
 settings.postIEDWindowSeconds = ...
     settings.postIEDWindowMilliseconds / 1000;
-settings.maximumRTSeconds = 15;
+settings.maximumRTSeconds = 20;
 settings.defaultSamplingFrequencyHz = 1000;
 settings.combineLeftAndRight = true;
 settings.includeUnknownArea = false;

@@ -83,7 +83,7 @@ for pt = 1:length(fileList)
     BRs = BRs(1:nTrials);
 
     nonControlTrials = isControl == 0;
-    validRT_10sec = isfinite(RTs) & RTs <= 10;
+    validRT_10sec = isfinite(RTs) & RTs <= 20;
     validBR = isfinite(BRs) & (BRs == 0 | BRs == 1);
 
     nIED_RT = countIEDsPerTrial(LFPIED, 'IED_occurance_RT', nTrials);

@@ -50,7 +50,7 @@ for pt = 1:length(fileList)
     isControl = isControl(1:nTrials);
 
     nonControlTrials = isControl == 0;
-    validRT_10sec = isfinite(RTs) & RTs <= 10;
+    validRT_10sec = isfinite(RTs) & RTs <= 20;
 
     nIED_RT = countIEDsPerTrial(LFPIED, 'IED_occurance_RT', nTrials);
     nIED_IT = countIEDsPerTrial(LFPIED, 'IED_occurance_IT', nTrials);
