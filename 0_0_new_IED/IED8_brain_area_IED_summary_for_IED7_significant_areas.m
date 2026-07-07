@@ -2,38 +2,7 @@
 % only anatomical areas that are FDR-significant in the combined IED8
 % area-specific Cox analysis.
 %
-% IMPORTANT
-% ---------
-% Run IED8_Cox_IT_RT_BR_postIED_by_brain_area.m first. This script reads:
-%   IT_brain_area_cox_results.csv
-%   RT_brain_area_cox_results.csv
-%   BR_brain_area_cox_results.csv
-%
-% An anatomical area is included in the figure when significantFDR is true
-% in at least one of the IT, RT, or BR IED8 result tables. The plotted bars
-% retain the IED7 definition:
-%   - RT-period IED events per implanted channel
-%   - IT-period IED events per implanted channel
-%
-% The BR model in IED8 uses IT-period IEDs. Therefore, an area significant
-% only for BR is still shown with its RT and IT descriptive IED counts in
-% this IED7-style grouped bar figure.
-%
-% IMPORTANT CHANNEL MAPPING
-% -------------------------
-% LFPIED.IED_occurance_RT(:,2) and LFPIED.IED_occurance_IT(:,2)
-% contain the LOCAL ECoG channel index (chz = 1:length(selectedChans)).
-% Therefore, the anatomical label is obtained safely as:
-%
-%   localChannelIndex    = IEDocc(:,2);
-%   originalChannelIndex = LFPIED.selectedChans(localChannelIndex);
-%   anatomicalArea       = LFPIED.anatomicalLocs(originalChannelIndex);
-%
-% Default IED7 filtering is retained:
-%   - only non-control trials
-%   - trials with RT > 10 s are excluded from both RT and IT
-%   - RT must be finite and > 0
-%   - IT must be finite and > 0 for the IT analysis
+
 %
 % Creates:
 %   1) all_IED_events_with_anatomy.csv
@@ -68,7 +37,7 @@ if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);
 end
 
-maximumRTSeconds = 10;
+maximumRTSeconds = 20;
 useOnlyNonControlTrials = true;
 
 % Combine homologous left- and right-hemisphere labels into one area.
@@ -706,15 +675,15 @@ function [significantAreas, membershipTable] = ...
         labels = strings(0, 1);
 
         if membershipTable.significantIT(aa)
-            labels(end + 1, 1) = "IT"; %#ok<AGROW>
+            labels(end + 1, 1) = "IT"; 
         end
 
         if membershipTable.significantRT(aa)
-            labels(end + 1, 1) = "RT"; %#ok<AGROW>
+            labels(end + 1, 1) = "RT"; 
         end
 
         if membershipTable.significantBR(aa)
-            labels(end + 1, 1) = "BR"; %#ok<AGROW>
+            labels(end + 1, 1) = "BR"; 
         end
 
         membershipTable.significantIn(aa) = strjoin(labels, ", ");
