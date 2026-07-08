@@ -35,7 +35,7 @@ inputFolderName_modeling = ...
 
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED9_brain_area_IED_expected_reward\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_brain_area_IED_expected_reward\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);
@@ -48,8 +48,8 @@ end
 % IT is longer, so use a 1000-ms window to capture a longer behavioral effect.
 % BR is defined during inflation time, so it uses the same 1000-ms window as IT.
 settings.postIEDWindowMillisecondsRT = 500;
-settings.postIEDWindowMillisecondsIT = 2000;
-settings.postIEDWindowMillisecondsBR = 2000;
+settings.postIEDWindowMillisecondsIT = 1000;
+settings.postIEDWindowMillisecondsBR = 1000;
 
 settings.maximumRTSeconds = 20;
 settings.defaultSamplingFrequencyHz = 1000;
@@ -440,7 +440,7 @@ function [areaResults, areaModels] = runMechanisticBrainAreaAnalysis( ...
         newParticipant.samplingFrequencyHz = samplingFrequencyHz;
         newParticipant.selectedAreaLabels = selectedAreaLabels;
 
-        participants(end + 1) = newParticipant; %#ok<AGROW>
+        participants(end + 1) = newParticipant; 
 
         participantAreas = unique(selectedAreaLabels, 'stable');
 
@@ -546,7 +546,7 @@ function [areaResults, areaModels] = runMechanisticBrainAreaAnalysis( ...
                     postIEDWindowSeconds);
 
                 countingProcessData = ...
-                    [countingProcessData; trialRows]; %#ok<AGROW>
+                    [countingProcessData; trialRows]; 
 
             end
 
@@ -787,7 +787,7 @@ function [areaResults, areaModels] = runMechanisticBrainAreaAnalysis( ...
             'VariableNames', ...
                 areaResults.Properties.VariableNames);
 
-        areaResults = [areaResults; newRow]; %#ok<AGROW>
+        areaResults = [areaResults; newRow]; 
 
         fprintf('Status: %s\n', status);
         fprintf('Coverage participants: %d\n', ...
@@ -1303,10 +1303,10 @@ function [X, predictorNames, referenceColorName] = ...
     for cc = 1:length(comparisonColors)
         colorCode = comparisonColors(cc);
         X(:, end + 1) = double( ...
-            countingProcessData.balloonColorCode == colorCode); %#ok<AGROW>
+            countingProcessData.balloonColorCode == colorCode); 
         predictorNames(end + 1, 1) = ...
             colorNames(colorCode) + "_vs_" + ...
-            colorNames(referenceColor); %#ok<AGROW>
+            colorNames(referenceColor); 
     end
 
     X(:, end + 1) = postIED .* expectedReward;

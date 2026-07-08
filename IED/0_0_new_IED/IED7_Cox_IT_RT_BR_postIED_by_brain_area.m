@@ -1,26 +1,6 @@
 % Combined area-specific participant-stratified Cox analyses
 %
-% Runs three models in one script:
-%   1) Inflation time (IT)
-%   2) Response time (RT)
-%   3) Banking rate (BR)
-%
-% The final figure contains one 1x3 set of forest plots. Each panel shows
-% only FDR-significant anatomical areas. NaC/nucleus accumbens and white
-% matter and lateral-ventricle labels are excluded before fitting, correction, saving, and plotting.
-%
-% Outputs:
-%   IT_brain_area_cox_results.csv
-%   RT_brain_area_cox_results.csv
-%   BR_brain_area_cox_results.csv
-%   IT_brain_area_cox_models.mat
-%   RT_brain_area_cox_models.mat
-%   BR_brain_area_cox_models.mat
-%   IT_brain_area_console_output.txt
-%   RT_brain_area_console_output.txt
-%   BR_brain_area_console_output.txt
-%   IT_RT_BR_brain_area_cox_forest_plot.pdf
-%   IT_RT_BR_brain_area_cox_all_results.mat
+
 %
 % Author: Nill
 
@@ -46,8 +26,8 @@ end
 % RT is relatively short, so use 500 ms.
 % IT and BR unfold over inflation time, so use 1000 ms.
 settings.postIEDWindowMillisecondsRT = 500;
-settings.postIEDWindowMillisecondsIT = 2000;
-settings.postIEDWindowMillisecondsBR = 2000;
+settings.postIEDWindowMillisecondsIT = 1000;
+settings.postIEDWindowMillisecondsBR = 1000;
 
 settings.maximumRTSeconds = 20;
 settings.defaultSamplingFrequencyHz = 1000;
