@@ -35,7 +35,7 @@ inputFolderName_modeling = ...
 
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_brain_area_IED_expected_reward\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_cox_expected_reward_by_brain_area\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);
