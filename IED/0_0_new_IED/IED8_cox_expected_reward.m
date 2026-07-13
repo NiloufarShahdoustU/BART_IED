@@ -24,6 +24,10 @@
 % Primary coefficient:
 %   beta_IEDxV = post-IED x expected-reward interaction
 %
+% Inference:
+%   Participant-level sign-flip permutation tests with 1000 permutations.
+%   Cox coefficients and cluster-robust standard errors/95% CIs are retained.
+%
 % Outcome-specific post-IED windows:
 %   IT = 1000 ms
 %   RT =  500 ms
@@ -66,6 +70,8 @@ settings.postIEDWindowMillisecondsBR = 1000;
 settings.maximumRTSeconds = 20;
 settings.defaultSamplingFrequencyHz = 1000;
 settings.useOnlyNonControlTrials = true;
+settings.nPermutations = 1000;
+settings.permutationSeed = 12345;
 
 % Standard colors used in the other IED analyses.
 colorIT = [0.847  0.333  0.153];
@@ -570,12 +576,24 @@ function result = runOverallMechanisticCoxAnalysis( ...
             'Baseline', 0, ...
             'Options', coxOptions);
 
-    %% Participant-clustered robust inference
+    %% Participant-clustered permutation inference
+
+    analysisSeed = settings.permutationSeed + sum(double(codeChar));
 
     [clusterRobustCovariance, clusterRobustSE, ...
-        clusterRobustZ, clusterRobustP] = ...
-        computeClusterRobustInference( ...
-            stats, beta, countingProcessData.patientStratum);
+        clusterRobustZ, clusterRobustAsymptoticP, ...
+        permutationP, permutationNullZ] = ...
+        computeClusterRobustPermutationInference( ...
+            stats, ...
+            beta, ...
+            countingProcessData.patientStratum, ...
+            settings.nPermutations, ...
+            analysisSeed, ...
+            X, ...
+            T, ...
+            censoring, ...
+            strata, ...
+            coxOptions);
 
     %% Results table
 
@@ -597,7 +615,8 @@ function result = runOverallMechanisticCoxAnalysis( ...
         stats.p(:), ...
         clusterRobustSE(:), ...
         clusterRobustZ(:), ...
-        clusterRobustP(:), ...
+        clusterRobustAsymptoticP(:), ...
+        permutationP(:), ...
         betaCILow(:), ...
         betaCIHigh(:), ...
         hazardRatio(:), ...
@@ -612,6 +631,7 @@ function result = runOverallMechanisticCoxAnalysis( ...
             'modelBasedPValue', ...
             'clusterRobustSE', ...
             'clusterRobustZ', ...
+            'clusterRobustAsymptoticPValue', ...
             'pValue', ...
             'betaCILow', ...
             'betaCIHigh', ...
@@ -661,6 +681,8 @@ function result = runOverallMechanisticCoxAnalysis( ...
         char(referenceBalloonColor));
     fprintf('log likelihood: %.6f\n', logLikelihood);
     fprintf('participants loaded: %d\n', nLoadedParticipants);
+    fprintf('permutation test: participant-level sign flips\n');
+    fprintf('number of permutations: %d\n', settings.nPermutations);
     fprintf('skipped for missing model file: %d\n', ...
         nSkippedMissingModelFile);
     fprintf('skipped for invalid model file: %d\n\n', ...
@@ -679,7 +701,7 @@ function result = runOverallMechanisticCoxAnalysis( ...
     fprintf('95%% HR CI = [%.6f, %.6f]\n', ...
         hazardRatioCILow(interactionIndex), ...
         hazardRatioCIHigh(interactionIndex));
-    fprintf('p = %.6g\n', clusterRobustP(interactionIndex));
+    fprintf('permutation p = %.6g\n', permutationP(interactionIndex));
 
     slopeOutsideIED = beta(expectedRewardIndex);
     slopeInsideIED = beta(expectedRewardIndex) + ...
@@ -692,7 +714,7 @@ function result = runOverallMechanisticCoxAnalysis( ...
     fprintf('post-IED coefficient at expected reward = 0: %.6f\n', ...
         beta(IEDIndex));
 
-    if clusterRobustP(interactionIndex) < 0.05
+    if permutationP(interactionIndex) < 0.05
         if beta(interactionIndex) > 0
             fprintf(['conclusion: expected reward has a significantly ' ...
                 'more positive log-hazard slope after an IED.\n']);
@@ -721,7 +743,12 @@ function result = runOverallMechanisticCoxAnalysis( ...
     result.clusterRobustCovariance = clusterRobustCovariance;
     result.clusterRobustSE = clusterRobustSE;
     result.clusterRobustZ = clusterRobustZ;
-    result.clusterRobustP = clusterRobustP;
+    result.clusterRobustAsymptoticP = clusterRobustAsymptoticP;
+    result.clusterRobustP = permutationP;
+    result.permutationP = permutationP;
+    result.permutationNullZ = permutationNullZ;
+    result.nPermutations = settings.nPermutations;
+    result.permutationSeed = analysisSeed;
     result.predictorNames = predictorNames;
     result.patientLevels = patientLevels;
     result.referenceBalloonColor = referenceBalloonColor;
@@ -1277,44 +1304,115 @@ function balloonColorCode = mapBalloonColorCode(balloonType)
 
 end
 
-function [robustCovariance, robustSE, robustZ, robustP] = ...
-    computeClusterRobustInference(stats, beta, clusterID)
+function [robustCovariance, robustSE, robustZ, ...
+    robustAsymptoticP, permutationP, permutationNullZ] = ...
+    computeClusterRobustPermutationInference( ...
+        stats, beta, clusterID, nPermutations, randomSeed, ...
+        X, T, censoring, strata, coxOptions)
 
     beta = beta(:);
     nPredictors = length(beta);
     clusterID = clusterID(:);
 
+    if ~isscalar(nPermutations) || ~isfinite(nPermutations) || ...
+            nPermutations < 1
+        error('nPermutations must be a positive finite scalar.');
+    end
+
+    nPermutations = round(nPermutations);
+
     uniqueClusters = unique(clusterID(isfinite(clusterID)));
     nClusters = length(uniqueClusters);
+
+    if nClusters < 2
+        error(['At least two participants are required for the ' ...
+            'participant-level permutation test.']);
+    end
 
     canUseClusterScores = ...
         isfield(stats, 'scores') && ...
         size(stats.scores, 1) == length(clusterID) && ...
         size(stats.scores, 2) == nPredictors;
 
-    if nClusters < 2 || ~canUseClusterScores
-        robustCovariance = stats.covb;
-        robustSE = stats.se(:);
-        robustZ = stats.z(:);
-        robustP = stats.p(:);
-        return;
+    if canUseClusterScores
+        clusterScoreSums = zeros(nClusters, nPredictors);
+
+        for gg = 1:nClusters
+            rows = clusterID == uniqueClusters(gg);
+            thisClusterScores = stats.scores(rows, :);
+            thisClusterScores(~isfinite(thisClusterScores)) = 0;
+            clusterScoreSums(gg, :) = sum(thisClusterScores, 1);
+        end
+
+        bread = stats.covb;
+
+        % Scaling makes the outer products of the participant influences
+        % equal the finite-sample-corrected cluster-robust covariance.
+        clusterInfluence = sqrt(nClusters / (nClusters - 1)) .* ...
+            (clusterScoreSums * bread);
+
+        robustCovariance = clusterInfluence' * clusterInfluence;
+
+    else
+        % Some MATLAB releases do not return row-level Cox score residuals.
+        % In that case, obtain participant influences from leave-one-
+        % participant-out Cox fits.
+        jackknifeBetas = NaN(nClusters, nPredictors);
+        silentCoxOptions = coxOptions;
+        silentCoxOptions.Display = 'off';
+
+        for gg = 1:nClusters
+            keepRows = clusterID ~= uniqueClusters(gg);
+
+            try
+                betaWithoutParticipant = coxphfit( ...
+                    X(keepRows, :), ...
+                    T(keepRows, :), ...
+                    'Censoring', censoring(keepRows), ...
+                    'Strata', strata(keepRows), ...
+                    'Ties', 'efron', ...
+                    'Baseline', 0, ...
+                    'Options', silentCoxOptions);
+
+                betaWithoutParticipant = betaWithoutParticipant(:);
+
+                if length(betaWithoutParticipant) == nPredictors && ...
+                        all(isfinite(betaWithoutParticipant))
+                    jackknifeBetas(gg, :) = ...
+                        betaWithoutParticipant';
+                end
+            catch
+                % Failed leave-one-participant-out fits are excluded below.
+            end
+        end
+
+        validJackknifeRows = all(isfinite(jackknifeBetas), 2);
+        jackknifeBetas = jackknifeBetas(validJackknifeRows, :);
+        nValidClusters = size(jackknifeBetas, 1);
+
+        if nValidClusters < max(3, nPredictors + 1)
+            error(['Too few successful leave-one-participant-out Cox fits ' ...
+                'were available for permutation inference.']);
+        end
+
+        if nValidClusters < nClusters
+            warning('%d of %d leave-one-participant-out fits succeeded.', ...
+                nValidClusters, nClusters);
+        end
+
+        jackknifeMean = mean(jackknifeBetas, 1, 'omitnan');
+        jackknifeDeviations = jackknifeBetas - jackknifeMean;
+
+        clusterInfluence = sqrt( ...
+            (nValidClusters - 1) / nValidClusters) .* ...
+            jackknifeDeviations;
+
+        robustCovariance = clusterInfluence' * clusterInfluence;
+        nClusters = nValidClusters;
     end
 
-    clusterScoreSums = zeros(nClusters, nPredictors);
-
-    for gg = 1:nClusters
-        rows = clusterID == uniqueClusters(gg);
-        thisClusterScores = stats.scores(rows, :);
-        thisClusterScores(~isfinite(thisClusterScores)) = 0;
-        clusterScoreSums(gg, :) = sum(thisClusterScores, 1);
-    end
-
-    meat = clusterScoreSums' * clusterScoreSums;
-    bread = stats.covb;
-
-    robustCovariance = bread * meat * bread;
     robustCovariance = ...
-        (nClusters / (nClusters - 1)) .* robustCovariance;
+        (robustCovariance + robustCovariance') ./ 2;
 
     robustSE = sqrt(max(diag(robustCovariance), 0));
 
@@ -1322,7 +1420,31 @@ function [robustCovariance, robustSE, robustZ, robustP] = ...
     robustSE(zeroSERows) = stats.se(zeroSERows);
 
     robustZ = beta ./ robustSE;
-    robustP = 2 .* normcdf(-abs(robustZ), 0, 1);
+    robustAsymptoticP = 2 .* normcdf(-abs(robustZ), 0, 1);
+
+    permutationStream = RandStream( ...
+        'mt19937ar', 'Seed', round(randomSeed));
+
+    signMatrix = 2 .* double(rand( ...
+        permutationStream, nClusters, nPermutations) >= 0.5) - 1;
+
+    permutedCoefficientShifts = signMatrix' * clusterInfluence;
+    permutationNullZ = permutedCoefficientShifts ./ robustSE';
+
+    permutationP = zeros(nPredictors, 1);
+
+    for jj = 1:nPredictors
+        validNullValues = permutationNullZ(:, jj);
+        validNullValues = validNullValues(isfinite(validNullValues));
+
+        if isempty(validNullValues) || ~isfinite(robustZ(jj))
+            permutationP(jj) = NaN;
+        else
+            permutationP(jj) = (1 + sum( ...
+                abs(validNullValues) >= abs(robustZ(jj)))) ./ ...
+                (length(validNullValues) + 1);
+        end
+    end
 
 end
 
@@ -1636,13 +1758,11 @@ function plotExpectedRewardEffectPanel(ax, result, config)
     resultText = sprintf([ ...
         '\\beta_{IEDxV} = %.3f\n' ...
         '95%% CI [%.3f, %.3f]\n' ...
-        'p = %.3g\n'], ...
+        'permutation p = %.3g\n'], ...
         interactionRow.beta_logHazard, ...
         interactionRow.betaCILow, ...
         interactionRow.betaCIHigh, ...
-        interactionRow.pValue, ...
-        result.expectedRewardSlopeOutsideIED, ...
-        result.expectedRewardSlopeInsideIED);
+        interactionRow.pValue);
 
     text( ...
         ax, ...

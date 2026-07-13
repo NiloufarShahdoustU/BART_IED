@@ -50,7 +50,7 @@ nivParameterFile = fullfile( ...
     inputFolderName_Niv, 'alpha_comparison.csv');
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED10_Cox_niv_param\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED9_Cox_niv_param\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);
@@ -82,6 +82,8 @@ settings.minimumParticipantsWithIED = 2;
 settings.minimumEndpointEventsInsideWindow = 1;
 settings.minimumEndpointEventsOutsideWindow = 1;
 settings.numberOfNivCurvePoints = 200;
+settings.numberOfPermutations = 5000;
+settings.permutationSeed = 20260713;
 
 % Requested colors.
 colorIT = [0.847  0.333  0.153];
@@ -132,6 +134,10 @@ RT = runWholeIEDOutcomeAnalysis( ...
 
 BR = runWholeIEDOutcomeAnalysis( ...
     inputFolderName_LFPIED, "BR", settings, nivTable, nivSummary);
+
+% Apply one simple FDR correction to the six primary permutation tests:
+% IED and IED x Niv for IT, RT, and BR.
+[IT, RT, BR] = applyPrimaryPermutationFDR(IT, RT, BR);
 
 %% Save outcome-specific numerical outputs
 
@@ -376,7 +382,7 @@ function result = runWholeIEDOutcomeAnalysis( ...
                 nivAsymmetryRaw, ...
                 nivAsymmetryZ);
 
-            countingProcessData = [countingProcessData; trialRows]; %#ok<AGROW>
+            countingProcessData = [countingProcessData; trialRows]; 
 
             nIEDsInTrial = countValidIEDsInTrial( ...
                 IEDoccurrence, trialNumber, durationSeconds, ...
@@ -409,7 +415,7 @@ function result = runWholeIEDOutcomeAnalysis( ...
                 nivAsymmetryZ, ...
                 'VariableNames', trialSummary.Properties.VariableNames);
 
-            trialSummary = [trialSummary; newTrialSummaryRow]; %#ok<AGROW>
+            trialSummary = [trialSummary; newTrialSummaryRow]; 
 
         end
 
@@ -464,14 +470,14 @@ function result = runWholeIEDOutcomeAnalysis( ...
     for cc = 1:length(comparisonColors)
         colorCode = comparisonColors(cc);
         X(:, end + 1) = double( ...
-            countingProcessData.balloonColorCode == colorCode); %#ok<AGROW>
+            countingProcessData.balloonColorCode == colorCode); 
 
         predictorNames(end + 1, 1) = ...
-            colorNames(colorCode) + "_vs_" + colorNames(referenceColor); %#ok<AGROW>
+            colorNames(colorCode) + "_vs_" + colorNames(referenceColor); 
 
         predictorDisplayLabels(end + 1, 1) = ...
             capitalizeFirst(colorNames(colorCode)) + ...
-            " vs " + capitalizeFirst(colorNames(referenceColor)); %#ok<AGROW>
+            " vs " + capitalizeFirst(colorNames(referenceColor)); 
     end
 
     T = [countingProcessData.tStart, countingProcessData.tStop];
@@ -584,9 +590,14 @@ function result = runWholeIEDOutcomeAnalysis( ...
     %% Participant-clustered robust inference
 
     [clusterRobustCovariance, clusterRobustSE, ...
-        clusterRobustZ, clusterRobustP] = ...
+        clusterRobustZ, clusterRobustP, clusterScoreSums] = ...
         computeClusterRobustInference( ...
             stats, beta, countingProcessData.patientStratum);
+
+    permutationP = fastClusterWildPermutationP( ...
+        beta, stats.covb, clusterScoreSums, ...
+        settings.numberOfPermutations, ...
+        settings.permutationSeed + getOutcomeSeedOffset(analysisType));
 
     %% Results table
 
@@ -618,6 +629,8 @@ function result = runWholeIEDOutcomeAnalysis( ...
         clusterRobustSE(:), ...
         clusterRobustZ(:), ...
         clusterRobustP(:), ...
+        permutationP(:), ...
+        NaN(length(beta), 1), ...
         ciLowBeta(:), ...
         ciHighBeta(:), ...
         hazardRatio(:), ...
@@ -633,7 +646,9 @@ function result = runWholeIEDOutcomeAnalysis( ...
             'modelBasedPValue', ...
             'clusterRobustSE', ...
             'clusterRobustZ', ...
-            'pValue', ...
+            'clusterRobustPValue', ...
+            'permutationPValue', ...
+            'permutationFDRQValue', ...
             'betaCILow', ...
             'betaCIHigh', ...
             'hazardRatio', ...
@@ -688,7 +703,7 @@ function result = runWholeIEDOutcomeAnalysis( ...
     fprintf('95%% CI = [%.6f, %.6f]\n', ...
         mainIEDRow.hazardRatioCILow, ...
         mainIEDRow.hazardRatioCIHigh);
-    fprintf('p = %.6g\n', mainIEDRow.pValue);
+    fprintf('Permutation p = %.6g\n', mainIEDRow.permutationPValue);
 
     fprintf('\nIED x Niv interaction:\n');
     fprintf('beta = %.6f\n', interactionRow.beta_logHazard);
@@ -697,9 +712,9 @@ function result = runWholeIEDOutcomeAnalysis( ...
     fprintf('95%% CI = [%.6f, %.6f]\n', ...
         interactionRow.hazardRatioCILow, ...
         interactionRow.hazardRatioCIHigh);
-    fprintf('p = %.6g\n', interactionRow.pValue);
+    fprintf('Permutation p = %.6g\n', interactionRow.permutationPValue);
 
-    if interactionRow.pValue < 0.05
+    if interactionRow.permutationPValue < 0.05
         if interactionRow.beta_logHazard > 0
             fprintf([ ...
                 'Conclusion: the IED hazard effect becomes more positive ' ...
@@ -734,6 +749,8 @@ function result = runWholeIEDOutcomeAnalysis( ...
     result.clusterRobustSE = clusterRobustSE;
     result.clusterRobustZ = clusterRobustZ;
     result.clusterRobustP = clusterRobustP;
+    result.permutationP = permutationP;
+    result.numberOfPermutations = settings.numberOfPermutations;
     result.predictorNames = predictorNames;
     result.predictorDisplayLabels = predictorDisplayLabels;
     result.patientLevels = patientLevels;
@@ -1017,12 +1034,12 @@ function plotNivModerationPanel( ...
         'IED x Niv beta = %.3f\n' ...
         'HR multiplier per 1 SD = %.3f\n' ...
         '95%% CI [%.3f, %.3f]\n' ...
-        'p = %.3g'], ...
+        'Permutation FDR q = %.3g'], ...
         interactionRow.beta_logHazard, ...
         interactionRow.hazardRatio, ...
         interactionRow.hazardRatioCILow, ...
         interactionRow.hazardRatioCIHigh, ...
-        interactionRow.pValue);
+        interactionRow.permutationFDRQValue);
 
     text(ax, ...
         0.97, 0.96, resultText, ...
@@ -1994,7 +2011,101 @@ function balloonColorCode = mapBalloonColorCode(balloonType)
 
 end
 
-function [robustCovariance, robustSE, robustZ, robustP] = ...
+function [IT, RT, BR] = applyPrimaryPermutationFDR(IT, RT, BR)
+
+    rawP = [ ...
+        IT.coxResults.permutationPValue(1:2); ...
+        RT.coxResults.permutationPValue(1:2); ...
+        BR.coxResults.permutationPValue(1:2)];
+
+    q = benjaminiHochberg(rawP);
+
+    IT.coxResults.permutationFDRQValue(1:2) = q(1:2);
+    RT.coxResults.permutationFDRQValue(1:2) = q(3:4);
+    BR.coxResults.permutationFDRQValue(1:2) = q(5:6);
+
+    fprintf('\n============================================================\n');
+    fprintf('Primary permutation tests: Benjamini-Hochberg FDR\n');
+    fprintf('500 participant-cluster wild permutations per outcome.\n');
+    fprintf('IT: IED q = %.6g; IED x Niv q = %.6g\n', q(1), q(2));
+    fprintf('RT: IED q = %.6g; IED x Niv q = %.6g\n', q(3), q(4));
+    fprintf('BR: IED q = %.6g; IED x Niv q = %.6g\n', q(5), q(6));
+    fprintf('============================================================\n');
+
+end
+
+function q = benjaminiHochberg(p)
+
+    p = p(:);
+    q = NaN(size(p));
+    valid = isfinite(p);
+    pv = p(valid);
+
+    if isempty(pv)
+        return;
+    end
+
+    [sortedP, order] = sort(pv, 'ascend');
+    m = length(sortedP);
+    sortedQ = sortedP .* m ./ (1:m)';
+    sortedQ = flipud(cummin(flipud(sortedQ)));
+    sortedQ = min(sortedQ, 1);
+
+    unsortedQ = NaN(m, 1);
+    unsortedQ(order) = sortedQ;
+    q(valid) = unsortedQ;
+
+end
+
+function permutationP = fastClusterWildPermutationP( ...
+    beta, bread, clusterScoreSums, numberOfPermutations, seed)
+
+    beta = beta(:);
+    nPredictors = length(beta);
+
+    if isempty(clusterScoreSums) || size(clusterScoreSums, 1) < 2
+        permutationP = NaN(nPredictors, 1);
+        return;
+    end
+
+    previousStream = rng;
+    rng(seed, 'twister');
+
+    nClusters = size(clusterScoreSums, 1);
+    wildSigns = 2 .* (rand(nClusters, numberOfPermutations) >= 0.5) - 1;
+
+    % One-step wild-cluster draws. All 500 draws are calculated in one
+    % matrix operation, so no Cox-model refits are required.
+    nullCoefficientDraws = bread * clusterScoreSums' * wildSigns;
+    permutationP = (1 + sum( ...
+        abs(nullCoefficientDraws) >= abs(beta), 2)) ./ ...
+        (numberOfPermutations + 1);
+
+    rng(previousStream);
+
+    fprintf('Finished %d fast participant-cluster permutations.\n', ...
+        numberOfPermutations);
+
+end
+
+
+function offset = getOutcomeSeedOffset(analysisType)
+
+    switch analysisType
+        case "IT"
+            offset = 1000;
+        case "RT"
+            offset = 2000;
+        case "BR"
+            offset = 3000;
+        otherwise
+            offset = 0;
+    end
+
+end
+
+function [robustCovariance, robustSE, robustZ, robustP, ...
+    clusterScoreSums] = ...
     computeClusterRobustInference(stats, beta, clusterID)
 
     beta = beta(:);
@@ -2010,6 +2121,7 @@ function [robustCovariance, robustSE, robustZ, robustP] = ...
         size(stats.scores, 2) == nPredictors;
 
     if nClusters < 2 || ~canUseClusterScores
+        clusterScoreSums = [];
         robustCovariance = stats.covb;
         robustSE = stats.se(:);
         robustZ = stats.z(:);
