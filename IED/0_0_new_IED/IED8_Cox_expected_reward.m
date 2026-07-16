@@ -2,41 +2,7 @@
 %
 % This script analyzes ALL IEDs across all channels. It is NOT specific to
 % anatomical brain areas.
-%
-% Separate models are fitted for:
-%   1) IT: action timing during inflation time
-%   2) RT: response timing
-%   3) BR: cause-specific banking during inflation time
-%
-% Model for each outcome:
-%
-%   h_p(t) = h_0p(t) * exp[
-%       beta_IED * IED(t)
-%       + beta_V * V
-%       + beta_Color * Color
-%       + beta_IEDxV * IED(t) * V]
-%
-% where:
-%   IED(t) = 1 inside an outcome-specific post-IED window, otherwise 0
-%   V      = trial-wise expected reward from TDdataParamRecovery
-%   h_0p   = a separate baseline hazard for each participant
-%
-% Primary coefficient:
-%   beta_IEDxV = post-IED x expected-reward interaction
-%
-% Outcome-specific post-IED windows:
-%   IT = 1000 ms
-%   RT =  500 ms
-%   BR = 1000 ms
-%
-% Every IED row is retained. Duplicate IED times and IEDs from different
-% channels are not collapsed.
-%
-% The script saves ONE 3-by-2 PDF:
-%   Row 1: IT coefficient forest plot | IT adjusted value curves
-%   Row 2: RT coefficient forest plot | RT adjusted value curves
-%   Row 3: BR coefficient forest plot | BR adjusted value curves
-%
+
 % Author: Nill
 
 clear;
@@ -425,7 +391,7 @@ function result = runOverallMechanisticCoxAnalysis( ...
                 postIEDWindowSeconds);
 
             countingProcessData = [ ...
-                countingProcessData; trialRows]; %#ok<AGROW>
+                countingProcessData; trialRows]; 
 
             nIEDsInTrial = countIEDsInTrial( ...
                 IEDoccurrence, trial, durationSeconds, ...
@@ -464,7 +430,7 @@ function result = runOverallMechanisticCoxAnalysis( ...
                     trialSummary.Properties.VariableNames);
 
             trialSummary = [ ...
-                trialSummary; newTrialSummaryRow]; %#ok<AGROW>
+                trialSummary; newTrialSummaryRow]; 
 
         end
 
@@ -1100,10 +1066,10 @@ function [X, predictorNames, referenceColorName] = ...
     for cc = 1:length(comparisonColors)
         colorCode = comparisonColors(cc);
         X(:, end + 1) = double( ...
-            countingProcessData.balloonColorCode == colorCode); %#ok<AGROW>
+            countingProcessData.balloonColorCode == colorCode); 
         predictorNames(end + 1, 1) = ...
             colorNames(colorCode) + "_vs_" + ...
-            colorNames(referenceColor); %#ok<AGROW>
+            colorNames(referenceColor); 
     end
 
     X(:, end + 1) = postIED .* expectedReward;

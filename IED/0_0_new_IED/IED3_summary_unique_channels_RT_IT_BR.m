@@ -1,29 +1,6 @@
 % Summarize number of unique IED channels per trial vs RT, IT, and BR
-% Creates:
-% 1) per_patient_results.csv
-% 2) group_per_patient_slope_summary.csv
-% 3) group_mixed_effects_results.csv
-% 4) summary_boxplots.pdf
-%
-% Only non-control trials
-% Trials with RT > 10 seconds are removed from RT, IT, and BR analyses
-% Trials with 0 unique IED channels are included
-% x datapoints are transformed as log10(unique IED channel count + 1) so zero-channel trials are included
-% RT and IT remain raw seconds
-% BR is binary: 0 = not banked, 1 = banked
-%
-% Per-patient model:
-%   RT/IT: linear model, y ~ logX, where logX = log10(unique IED channel count + 1)
-%   BR: logistic model, BR ~ logX, where logX = log10(unique IED channel count + 1)
-%
-% Group mixed-effects model:
-%   RT/IT: y ~ logX + (1 | patientID)
-%   BR: BR ~ logX + (1 | patientID), binomial/logit
-%
-% Multiple hypothesis correction:
-%   FDR and Bonferroni are saved
-%   Figure stars use FDR-corrected mixed-effects p-values
-%
+
+
 % Author: Nill
 
 clear;

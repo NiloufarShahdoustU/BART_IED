@@ -1,32 +1,6 @@
 % Summarize where RT- and IT-period IEDs occur anatomically, but plot
 % only anatomical areas that are FDR-significant in EITHER analysis folder:
-%
-%   1) IED7_Cox_IT_RT_BR_postIED_by_brain_area
-%      Significant variable: significantFDR
-%
-%   2) IED8_brain_area_IED_expected_reward
-%      Significant variable: significantFDR_IEDxExpectedReward
-%
-% Definition used here
-% --------------------
-% An area is retained when it is significant in at least one of IT, RT, or
-% BR in the post-IED folder OR significant in at least one of IT, RT, or BR
-% in the expected-reward folder. Thus, this is the union across all
-% significant areas from both folders.
-%
-% Creates:
-%   1) all_IED_events_with_anatomy.csv
-%   2) per_patient_brain_area_summary.csv
-%   3) group_brain_area_summary.csv
-%   4) channel_coverage_by_brain_area.csv
-%   5) significant_area_membership_union_both_folders.csv
-%   6) brain_area_IED_distribution_union_both_folders.pdf
-%
-% The PDF retains the original grouped-bar format:
-%   - RT-period IED events per implanted channel
-%   - IT-period IED events per implanted channel
-%   - participant coverage counts above each bar
-%
+
 % Author: Nill
 
 clear;

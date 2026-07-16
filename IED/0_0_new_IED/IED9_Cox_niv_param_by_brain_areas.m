@@ -1,10 +1,5 @@
 % Channel-specific Niv-asymmetry Cox analysis for IT, RT, and BR
-%
-% the channel-level Cox model first
-% estimates the post-IED effect for each participant and channel. The Niv
-% moderation test is then performed across participants within each
-% anatomical area. A within-participant postIED x Niv Cox interaction would
-% be unidentifiable because Niv is constant within that participant.
+
 
 clear; clc; close all;
 

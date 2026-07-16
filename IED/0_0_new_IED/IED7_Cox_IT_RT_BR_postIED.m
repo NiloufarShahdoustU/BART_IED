@@ -1,29 +1,5 @@
 % Combined participant-stratified Cox analyses for IT, RT, and BR
-%
-% This script combines:
-%   1) IT action timing during inflation time
-%   2) RT response timing
-%   3) BR cause-specific banking during inflation time
-%
-% Primary time-varying predictor for every model:
-%   activeIEDWindowCount(t) = number of individual IEDs whose 500-ms
-%                             post-IED windows are active at time t
-%
-% Every IED row is retained. IEDs are not collapsed with unique(), even
-% when they occur at the same sample or in the same channel.
-%
-% Participant ID is used as a stratum, so each participant has a separate
-% baseline hazard. Participant-clustered robust standard errors are used
-% for confidence intervals and p-values.
-%
-% Only non-control yellow, orange, and red balloon trials are included.
-% Trials with RT > maximumRTSeconds are excluded. Trials with no IEDs are
-% included and remain unexposed throughout.
-%
-% The script saves ONE visualization PDF containing a 3-by-2 layout:
-%   Row 1: IT forest plot | IT adjusted IED-count effect
-%   Row 2: RT forest plot | RT adjusted IED-count effect
-%   Row 3: BR forest plot | BR adjusted IED-count effect
+
 %
 % Author: Nill
 
@@ -122,7 +98,7 @@ for aa = 1:length(analysisConfigs)
     if aa == 1
         analysisResults = currentResult;
     else
-        analysisResults(aa) = currentResult; %#ok<SAGROW>
+        analysisResults(aa) = currentResult; 
     end
 
 end
@@ -363,7 +339,7 @@ function result = runPostIEDCoxAnalysis( ...
                 finalEventObserved, ...
                 postIEDWindowSeconds);
 
-            countingProcessData = [countingProcessData; trialRows]; %#ok<AGROW>
+            countingProcessData = [countingProcessData; trialRows]; 
 
             if isempty(IEDoccurrence) || size(IEDoccurrence, 2) < 1
                 nIEDsInTrial = 0;
@@ -412,7 +388,7 @@ function result = runPostIEDCoxAnalysis( ...
                     'samplingFrequencyHz' ...
                 });
 
-            trialSummary = [trialSummary; newTrialSummaryRow]; %#ok<AGROW>
+            trialSummary = [trialSummary; newTrialSummaryRow]; 
 
         end
 
@@ -967,7 +943,7 @@ function patientEventRates = calculatePatientEventRates( ...
                 'crudeRateRatio' ...
             });
 
-        patientEventRates = [patientEventRates; newRow]; %#ok<AGROW>
+        patientEventRates = [patientEventRates; newRow]; 
 
     end
 

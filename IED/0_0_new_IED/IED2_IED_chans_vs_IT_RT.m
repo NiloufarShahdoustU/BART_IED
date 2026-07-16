@@ -1,13 +1,4 @@
 % Plot number of IEDs and unique IED channels per trial vs RT and IT
-% One 2x2 PDF per participant
-% Only non-control trials
-% Trials with 0 IEDs / 0 IED channels are NOT shown
-% Trials with RT > 10 seconds are removed from BOTH RT and IT plots
-% No outlier removal
-% Only x datapoints are log10-transformed before plotting and fitting
-% Linear fit using log10(x) and raw y
-% Fitted line with SEM band
-% Each subplot is square
 % Author: Nill
 
 clear;

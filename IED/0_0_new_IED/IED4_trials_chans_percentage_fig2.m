@@ -1,17 +1,7 @@
 % Scatter-boxplot of:
 % 1) Mean number of IEDs per valid trial
 % 2) Mean number of unique IED channels per valid trial
-%
-% RT = blue
-% IT = orange
-%
-% Only non-control trials
-% Trials with RT > 10 seconds are removed from BOTH RT and IT calculations
-% Trials with zero IEDs are included in the averages
-% No log transform
-% No outlier removal
-% Each dot = one participant
-% Author: Nill
+
 
 clear;
 clc;

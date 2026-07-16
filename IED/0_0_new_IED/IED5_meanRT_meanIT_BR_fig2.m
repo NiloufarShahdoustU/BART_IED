@@ -2,16 +2,7 @@
 % 1) Mean RT per participant
 % 2) Mean IT per participant
 % 3) Mean BR (BankedTrials) per participant
-%
-% RT = blue
-% IT = orange
-% BR = green
-%
-% Only control trials
-% Trials with RT > 10 seconds are removed from RT, IT, and BR calculations
-% No log transform
-% No outlier removal
-% Each dot = one participant
+
 % Author: Nill
 
 clear;

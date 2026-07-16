@@ -1,34 +1,5 @@
 % Whole-IED participant-stratified Cox analyses for IT, RT, and BR
-%
-% This script ignores anatomical brain area and uses every IED occurrence.
-% Duplicate IED rows are retained. If several IED windows overlap, the
-% time-varying predictor equals the number of simultaneously active windows.
-%
-% Primary model for each outcome:
-%
-%   hazard(t) = h0_participant(t) * exp[
-%       beta_IED * activeIEDWindowCount(t)
-%       + beta_IEDxNiv * activeIEDWindowCount(t) * NivZ
-%       + balloon-color covariates]
-%
-% Niv asymmetry:
-%
-%   Niv = (alphaMinus - alphaPlus) / (alphaMinus + alphaPlus)
-%
-% Because participant is used as a Cox stratum, the participant-level Niv
-% main effect cannot be estimated separately. The important coefficient is
-% the IED x Niv interaction.
-%
-% Outcomes:
-%   IT: endpoint is the action at the end of inflation time.
-%   RT: endpoint is the response at the end of response time.
-%   BR: endpoint is banking; non-banked trials are censored at the end of IT.
-%
-% Figure:
-%   3 rows x 2 columns
-%   Row 1: IT forest plot | IT IED x Niv moderation curve
-%   Row 2: RT forest plot | RT IED x Niv moderation curve
-%   Row 3: BR forest plot | BR IED x Niv moderation curve
+
 %
 % Author: Nill
 
@@ -376,7 +347,7 @@ function result = runWholeIEDOutcomeAnalysis( ...
                 nivAsymmetryRaw, ...
                 nivAsymmetryZ);
 
-            countingProcessData = [countingProcessData; trialRows]; %#ok<AGROW>
+            countingProcessData = [countingProcessData; trialRows]; 
 
             nIEDsInTrial = countValidIEDsInTrial( ...
                 IEDoccurrence, trialNumber, durationSeconds, ...
@@ -409,7 +380,7 @@ function result = runWholeIEDOutcomeAnalysis( ...
                 nivAsymmetryZ, ...
                 'VariableNames', trialSummary.Properties.VariableNames);
 
-            trialSummary = [trialSummary; newTrialSummaryRow]; %#ok<AGROW>
+            trialSummary = [trialSummary; newTrialSummaryRow]; 
 
         end
 
@@ -464,14 +435,14 @@ function result = runWholeIEDOutcomeAnalysis( ...
     for cc = 1:length(comparisonColors)
         colorCode = comparisonColors(cc);
         X(:, end + 1) = double( ...
-            countingProcessData.balloonColorCode == colorCode); %#ok<AGROW>
+            countingProcessData.balloonColorCode == colorCode); 
 
         predictorNames(end + 1, 1) = ...
-            colorNames(colorCode) + "_vs_" + colorNames(referenceColor); %#ok<AGROW>
+            colorNames(colorCode) + "_vs_" + colorNames(referenceColor); 
 
         predictorDisplayLabels(end + 1, 1) = ...
             capitalizeFirst(colorNames(colorCode)) + ...
-            " vs " + capitalizeFirst(colorNames(referenceColor)); %#ok<AGROW>
+            " vs " + capitalizeFirst(colorNames(referenceColor)); 
     end
 
     T = [countingProcessData.tStart, countingProcessData.tStop];
@@ -823,7 +794,7 @@ function saveOutcomeOutputs(result, outputFolderName)
     writematrix(result.baselineCumulativeHazard, ...
         baselineHazardOutputFile);
 
-    outcomeResult = result; %#ok<NASGU>
+    outcomeResult = result; 
     save(modelOutputFile, 'outcomeResult');
 
     fprintf('\nSaved %s outputs:\n', prefix);

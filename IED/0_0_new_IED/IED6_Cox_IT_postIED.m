@@ -1,21 +1,5 @@
 % Cox proportional hazards model for action timing during IT
-%
-% Primary time-varying predictor:
-%   activeIEDWindowCount(t) = number of individual IEDs whose 500 ms
-%                             post-IED windows are active at time t
-%
-% Every IED row is retained. IEDs are not collapsed with unique(), even
-% when they occur at the same sample or in the same channel. Therefore,
-% two active IED windows contribute a predictor value of 2, three contribute
-% a value of 3, and so on. The model estimates the hazard change per
-% additional active IED while adjusting for balloon color.
-%
-% Participant ID is used as a stratum, so each participant has a separate
-% baseline hazard. Participant-clustered robust standard errors are saved.
-%
-% Only non-control yellow, orange, and red balloon trials are included.
-% Trials with RT > 10 seconds are excluded.
-% Trials with no IEDs are included and remain unexposed throughout.
+
 %
 % Author: Nill
 

@@ -1,26 +1,5 @@
 % Test whether longer inter-pump time (IT) is associated with
 % a higher or lower probability of banking across participants.
-%
-% Main analysis:
-%   Logistic mixed-effects model with participant-specific random intercept:
-%       BR ~ IT_within + meanIT_between + (1 | patientID)
-%
-% IT_within:
-%   Trial IT minus that participant's mean IT.
-%   This is the main effect of interest:
-%       beta < 0  -> longer-than-usual IT predicts LOWER banking probability
-%       beta > 0  -> longer-than-usual IT predicts HIGHER banking probability
-%
-% meanIT_between:
-%   Participant mean IT, centered around the group mean.
-%   This tests whether generally slower participants bank more or less often.
-%
-% A random-slope model is attempted first:
-%       BR ~ IT_within + meanIT_between + (1 + IT_within | patientID)
-% If it fails, the code automatically uses the random-intercept model.
-
-
-%%%%% Do participants with a higher average IT tend to have a higher or lower bank rate than participants with a lower average IT?
 
 clear;
 clc;

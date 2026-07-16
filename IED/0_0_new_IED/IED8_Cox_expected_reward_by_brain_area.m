@@ -1,24 +1,5 @@
 % Brain-area-specific mechanistic Cox analyses with expected reward
-%
-% Model fitted separately for IT, RT, and BR within each anatomical area:
-%
-%   h_p(t) = h_0p(t) * exp[
-%       beta_IED * IED(t)
-%       + beta_V * V
-%       + beta_Color * Color
-%       + beta_IEDxV * IED(t) * V]
-%
-% IED(t) is 1 during an outcome-specific post-IED window and 0 otherwise.
-% Primary windows: RT = 500 ms; IT = 1000 ms; BR = 1000 ms.
-% V is the trial-wise expected reward read from TDdataParamRecovery.
-% Participant-specific differences are handled by participant strata, so
-% every participant has a separate baseline hazard h_0p(t).
-%
-% The primary coefficient is beta_IEDxV:
-%   beta_IEDxV < 0: the expected-reward log-hazard slope is lower after an IED.
-%   beta_IEDxV > 0: the expected-reward log-hazard slope is higher after an IED.
-% Whether the absolute influence is weaker or stronger also depends on beta_V.
-%
+
 % Author: Nill
 
 clear;
