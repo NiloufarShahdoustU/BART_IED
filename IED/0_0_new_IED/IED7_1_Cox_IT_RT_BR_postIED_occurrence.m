@@ -27,7 +27,7 @@ diary(textOutputFile);
 
 samplingFrequency = 1000;
 maximumRT = 20;
-numberOfPermutations = 5;
+numberOfPermutations = 500;
 randomSeed = 42;
 
 colorIT = [0.847 0.333 0.153];
