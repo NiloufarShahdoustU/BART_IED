@@ -13,7 +13,7 @@ inputFolderName_LFPIED = ...
     'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED7_Cox_IT_RT_BR_postIED\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED7_2_Cox_IT_RT_BR_postIED_count\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);

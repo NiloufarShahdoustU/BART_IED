@@ -18,7 +18,7 @@ inputFolderName_modeling = ...
     'D:\Nill\data\BART\0_0_new_IED\context_modeling\param_recovery_1_modeling\';
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_cox_expected_reward_counts\';
+    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_2_Cox_expected_reward_count\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);

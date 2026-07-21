@@ -1,7 +1,6 @@
-% Summarize number of IEDs per trial vs RT, IT, and BR
+% Summarize number of unique IED channels per trial vs RT, IT, and BR
 
 
-%
 % Author: Nill
 
 clear;
@@ -9,7 +8,7 @@ clc;
 close all;
 
 inputFolderName_LFPIED = 'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
-outputFolderName = 'D:\Nill\code\BART\IED\0_0_new_IED\IED3_summary_of_IED2\';
+outputFolderName = 'D:\Nill\code\BART\IED\0_0_new_IED\IED3_summary_of_IED2_chans_without_log\';
 
 summaryFolder = fullfile(outputFolderName);
 
@@ -17,8 +16,8 @@ if ~exist(summaryFolder, 'dir')
     mkdir(summaryFolder);
 end
 
-% BR analysis uses only the number of IEDs occurring during IT.
-% Trials with 0 IT-period IEDs are included in the BR analysis.
+% BR analysis uses only the number of unique IED channels during IT.
+% Trials with 0 IT-period unique IED channels are included in the BR analysis.
 
 fileList = dir(fullfile(inputFolderName_LFPIED, '*.LFPIED.mat'));
 
@@ -64,21 +63,21 @@ for pt = 1:length(fileList)
     validRT_10sec = isfinite(RTs) & RTs <= 20;
     validBR = isfinite(BRs) & (BRs == 0 | BRs == 1);
 
-    nIED_RT = countIEDsPerTrial(LFPIED, 'IED_occurance_RT', nTrials);
-    nIED_IT = countIEDsPerTrial(LFPIED, 'IED_occurance_IT', nTrials);
+    nUniqueChans_RT = countUniqueChannelsPerTrial(LFPIED, 'IED_occurance_RT', nTrials);
+    nUniqueChans_IT = countUniqueChannelsPerTrial(LFPIED, 'IED_occurance_IT', nTrials);
 
-    % For BR, use only IED count during IT.
-    nIED_BR = nIED_IT;
-    xMeasureBR = 'IED count during IT';
+    % For BR, use only the unique IED channel count during IT.
+    nUniqueChans_BR = nUniqueChans_IT;
+    xMeasureBR = 'Unique IED channels during IT';
 
-    keep_IED_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nIED_RT >= 0;
-    keep_IED_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nIED_IT >= 0;
-    keep_IED_BR = nonControlTrials & validRT_10sec & validBR & nIED_BR >= 0;
+    keep_chans_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nUniqueChans_RT >= 0;
+    keep_chans_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nUniqueChans_IT >= 0;
+    keep_chans_BR = nonControlTrials & validRT_10sec & validBR & nUniqueChans_BR >= 0;
 
     panels = {
-        'IED_count_vs_RT', 'IED count during RT', 'RT', nIED_RT, RTs, keep_IED_RT;
-        'IED_count_vs_IT', 'IED count during IT', 'IT', nIED_IT, ITs, keep_IED_IT;
-        'IED_count_vs_BR', xMeasureBR, 'BR', nIED_BR, BRs, keep_IED_BR
+        'Unique_channels_vs_RT', 'Unique IED channels during RT', 'RT', nUniqueChans_RT, RTs, keep_chans_RT;
+        'Unique_channels_vs_IT', 'Unique IED channels during IT', 'IT', nUniqueChans_IT, ITs, keep_chans_IT;
+        'Unique_channels_vs_BR', xMeasureBR, 'BR', nUniqueChans_BR, BRs, keep_chans_BR
     };
 
     for pp = 1:size(panels, 1)
@@ -93,9 +92,9 @@ for pt = 1:length(fileList)
         rawX = xAll(keepIdx);
         y = yAll(keepIdx);
 
-        [rawX, logX, y] = cleanPanelData(rawX, y, yMeasure);
+        [rawX, y] = cleanPanelData(rawX, y, yMeasure);
 
-        statsRow = summarizeOnePanel(rawX, logX, y, yMeasure);
+        statsRow = summarizeOnePanel(rawX, y, yMeasure);
 
         newPerPatientRow = table( ...
             string(ptID), ...
@@ -147,9 +146,9 @@ for pt = 1:length(fileList)
 
         perPatientResults = [perPatientResults; newPerPatientRow];
 
-        if ~isempty(logX)
+        if ~isempty(rawX)
 
-            n = length(logX);
+            n = length(rawX);
 
             newTrialRows = table( ...
                 repmat(string(ptID), n, 1), ...
@@ -157,7 +156,6 @@ for pt = 1:length(fileList)
                 repmat(string(xMeasure), n, 1), ...
                 repmat(string(yMeasure), n, 1), ...
                 rawX(:), ...
-                logX(:), ...
                 y(:), ...
                 'VariableNames', { ...
                     'patientID', ...
@@ -165,7 +163,6 @@ for pt = 1:length(fileList)
                     'xMeasure', ...
                     'yMeasure', ...
                     'rawX', ...
-                    'logX', ...
                     'y' ...
                 });
 
@@ -198,7 +195,7 @@ disp(['Saved: ' groupSlopeSummaryOutputFile]);
 disp(['Saved: ' groupMixedEffectsOutputFile]);
 disp(['Saved: ' summaryPDF]);
 
-function [rawX, logX, y] = cleanPanelData(rawX, y, yMeasure)
+function [rawX, y] = cleanPanelData(rawX, y, yMeasure)
 
     rawX = rawX(:);
     y = y(:);
@@ -212,14 +209,11 @@ function [rawX, logX, y] = cleanPanelData(rawX, y, yMeasure)
     rawX = rawX(validIdx);
     y = y(validIdx);
 
-    logX = log10(rawX + 1);
-
 end
 
-function statsRow = summarizeOnePanel(rawX, logX, y, yMeasure)
+function statsRow = summarizeOnePanel(rawX, y, yMeasure)
 
     rawX = rawX(:);
-    logX = logX(:);
     y = y(:);
 
     statsRow.nPoints = length(y);
@@ -258,24 +252,24 @@ function statsRow = summarizeOnePanel(rawX, logX, y, yMeasure)
         statsRow.yMedian = median(y, 'omitnan');
     end
 
-    if length(logX) <= 2 || length(unique(logX)) <= 1
+    if length(rawX) <= 2 || length(unique(rawX)) <= 1
         return;
     end
 
-    T = table(logX, y, 'VariableNames', {'logX', 'y'});
+    T = table(rawX, y, 'VariableNames', {'rawX', 'y'});
 
     if string(yMeasure) == "BR"
 
         try
 
-            glm = fitglm(T, 'y ~ logX', ...
+            glm = fitglm(T, 'y ~ rawX', ...
                 'Distribution', 'binomial', ...
                 'Link', 'logit');
 
             coefTable = glm.Coefficients;
             ciTable = coefCI(glm);
 
-            slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'logX'));
+            slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'rawX'));
             interceptIdx = find(strcmp(coefTable.Properties.RowNames, '(Intercept)'));
 
             statsRow.modelIntercept = coefTable.Estimate(interceptIdx);
@@ -293,7 +287,7 @@ function statsRow = summarizeOnePanel(rawX, logX, y, yMeasure)
             statsRow.rSquared = NaN;
             statsRow.adjRSquared = NaN;
 
-            statsRow.modelType = "Per-patient logistic GLM: BR ~ logX";
+            statsRow.modelType = "Per-patient logistic GLM: BR ~ rawX";
 
         catch
 
@@ -306,12 +300,12 @@ function statsRow = summarizeOnePanel(rawX, logX, y, yMeasure)
 
         try
 
-            lm = fitlm(T, 'y ~ logX');
+            lm = fitlm(T, 'y ~ rawX');
 
             coefTable = lm.Coefficients;
             ciTable = coefCI(lm);
 
-            slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'logX'));
+            slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'rawX'));
             interceptIdx = find(strcmp(coefTable.Properties.RowNames, '(Intercept)'));
 
             statsRow.modelIntercept = coefTable.Estimate(interceptIdx);
@@ -325,7 +319,7 @@ function statsRow = summarizeOnePanel(rawX, logX, y, yMeasure)
             statsRow.rSquared = lm.Rsquared.Ordinary;
             statsRow.adjRSquared = lm.Rsquared.Adjusted;
 
-            statsRow.modelType = "Per-patient linear model: y ~ logX";
+            statsRow.modelType = "Per-patient linear model: y ~ rawX";
 
         catch
 
@@ -451,7 +445,7 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
         comparisonName = comparisonNames(cc);
 
         rowsAll = trialLevelData(trialLevelData.comparison == comparisonName, :);
-        rows = rowsAll(isfinite(rowsAll.logX) & isfinite(rowsAll.y), :);
+        rows = rowsAll(isfinite(rowsAll.rawX) & isfinite(rowsAll.y), :);
 
         nTrialPoints = height(rows);
         nPatients = length(unique(rows.patientID));
@@ -471,7 +465,7 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
 
         isBR = rowsAll.yMeasure(1) == "BR";
 
-        if nTrialPoints >= 10 && nPatients >= 2 && length(unique(rows.logX)) > 1
+        if nTrialPoints >= 10 && nPatients >= 2 && length(unique(rows.rawX)) > 1
 
             rows.patientID = categorical(rows.patientID);
 
@@ -483,14 +477,14 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
 
                     try
 
-                        glme = fitglme(rows, 'y ~ logX + (1 | patientID)', ...
+                        glme = fitglme(rows, 'y ~ rawX + (1 | patientID)', ...
                             'Distribution', 'Binomial', ...
                             'Link', 'logit');
 
                         coefTable = glme.Coefficients;
                         ciTable = coefCI(glme);
 
-                        slopeIdx = find(strcmp(coefTable.Name, 'logX'));
+                        slopeIdx = find(strcmp(coefTable.Name, 'rawX'));
 
                         beta = coefTable.Estimate(slopeIdx);
                         se = coefTable.SE(slopeIdx);
@@ -503,20 +497,20 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
                         oddsRatioCILow = exp(ciLow);
                         oddsRatioCIHigh = exp(ciHigh);
 
-                        modelType = "Logistic mixed-effects: BR ~ logX + (1 | patientID)";
+                        modelType = "Logistic mixed-effects: BR ~ rawX + (1 | patientID)";
 
                     catch
 
                         warning(['fitglme failed for ' char(comparisonName) '. Using pooled fitglm instead.']);
 
-                        glm = fitglm(rows, 'y ~ logX', ...
+                        glm = fitglm(rows, 'y ~ rawX', ...
                             'Distribution', 'binomial', ...
                             'Link', 'logit');
 
                         coefTable = glm.Coefficients;
                         ciTable = coefCI(glm);
 
-                        slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'logX'));
+                        slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'rawX'));
 
                         beta = coefTable.Estimate(slopeIdx);
                         se = coefTable.SE(slopeIdx);
@@ -539,12 +533,12 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
 
                 try
 
-                    lme = fitlme(rows, 'y ~ logX + (1 | patientID)');
+                    lme = fitlme(rows, 'y ~ rawX + (1 | patientID)');
 
                     coefTable = lme.Coefficients;
                     ciTable = coefCI(lme);
 
-                    slopeIdx = find(strcmp(coefTable.Name, 'logX'));
+                    slopeIdx = find(strcmp(coefTable.Name, 'rawX'));
 
                     beta = coefTable.Estimate(slopeIdx);
                     se = coefTable.SE(slopeIdx);
@@ -553,18 +547,18 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
                     ciLow = ciTable(slopeIdx, 1);
                     ciHigh = ciTable(slopeIdx, 2);
 
-                    modelType = "Linear mixed-effects: y ~ logX + (1 | patientID)";
+                    modelType = "Linear mixed-effects: y ~ rawX + (1 | patientID)";
 
                 catch
 
                     warning(['fitlme failed for ' char(comparisonName) '. Using pooled fitlm instead.']);
 
-                    lm = fitlm(rows, 'y ~ logX');
+                    lm = fitlm(rows, 'y ~ rawX');
 
                     coefTable = lm.Coefficients;
                     ciTable = coefCI(lm);
 
-                    slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'logX'));
+                    slopeIdx = find(strcmp(coefTable.Properties.RowNames, 'rawX'));
 
                     beta = coefTable.Estimate(slopeIdx);
                     se = coefTable.SE(slopeIdx);
@@ -603,7 +597,7 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
                 'yMeasure', ...
                 'nPatients', ...
                 'nTrialPoints', ...
-                'beta_log10IEDplus1', ...
+                'beta_UniqueChannels', ...
                 'SE', ...
                 'tStat', ...
                 'pValue', ...
@@ -713,7 +707,7 @@ function plotSummaryBoxplots(perPatientResults, summaryPDF, groupMixedEffectsRes
         comparisonOrder, ...
         colors, ...
         'modelSlope', ...
-        sprintf('Model slope\nRT/IT: seconds per log10(IED count + 1); BR: log-odds per log10(IED count + 1)'), ...
+        sprintf('Model slope\nRT/IT: seconds per unique IED channel; BR: log-odds per unique IED channel'), ...
         'Per-patient model slope', ...
         groupMixedEffectsResults, ...
         'pValue_FDR');
@@ -966,9 +960,9 @@ function sigStar = pToStars(pVal)
 
 end
 
-function nIED = countIEDsPerTrial(LFPIED, fieldName, nTrials)
+function nUniqueChansPerTrial = countUniqueChannelsPerTrial(LFPIED, fieldName, nTrials)
 
-    nIED = zeros(nTrials, 1);
+    nUniqueChansPerTrial = zeros(nTrials, 1);
 
     if ~isfield(LFPIED, fieldName)
         return;
@@ -976,21 +970,34 @@ function nIED = countIEDsPerTrial(LFPIED, fieldName, nTrials)
 
     IEDocc = LFPIED.(fieldName);
 
-    if isempty(IEDocc)
+    if isempty(IEDocc) || size(IEDocc, 2) < 2
         return;
     end
 
     trialIndices = IEDocc(:, 1);
+    channelIndices = IEDocc(:, 2);
 
     validRows = ...
         isfinite(trialIndices) & ...
+        isfinite(channelIndices) & ...
         trialIndices >= 1 & ...
-        trialIndices <= nTrials;
+        trialIndices <= nTrials & ...
+        channelIndices >= 1;
 
     trialIndices = round(trialIndices(validRows));
+    channelIndices = round(channelIndices(validRows));
 
-    if ~isempty(trialIndices)
-        nIED = accumarray(trialIndices, 1, [nTrials 1], @sum, 0);
+    if isempty(trialIndices)
+        return;
     end
+
+    uniqueTrialChannelPairs = unique([trialIndices channelIndices], 'rows');
+
+    nUniqueChansPerTrial = accumarray( ...
+        uniqueTrialChannelPairs(:, 1), ...
+        1, ...
+        [nTrials 1], ...
+        @sum, ...
+        0);
 
 end
