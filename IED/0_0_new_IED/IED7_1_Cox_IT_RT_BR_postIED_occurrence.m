@@ -48,7 +48,7 @@ configs(2).code = 'RT';
 configs(2).durationField = 'RTs';
 configs(2).iedField = 'IED_occurance_RT';
 configs(2).bankedOnly = false;
-configs(2).windowMilliseconds = 500;
+configs(2).windowMilliseconds = 1000;
 configs(2).color = colorRT;
 configs(2).hazardName = 'response';
 
