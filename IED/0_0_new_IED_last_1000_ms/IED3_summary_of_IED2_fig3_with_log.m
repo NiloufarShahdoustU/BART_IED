@@ -5,8 +5,8 @@ clear;
 clc;
 close all;
 
-inputFolder = 'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
-outputFolder = 'D:\Nill\code\BART\IED\0_0_new_IED\IED3_summary_of_IED2_with_log\';
+inputFolder = 'D:\Nill\data\BART\0_0_new_IED_last_1000_ms\IED1_find_number_of_IEDs\';
+outputFolder = 'D:\Nill\code\BART\IED\0_0_new_IED_last_1000_ms\IED3_summary_of_IED2_with_log\';
 
 mkdir(outputFolder);
 

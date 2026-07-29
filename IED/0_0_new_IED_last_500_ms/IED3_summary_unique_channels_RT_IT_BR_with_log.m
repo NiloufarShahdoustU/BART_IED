@@ -7,8 +7,8 @@ clear;
 clc;
 close all;
 
-inputFolderName_LFPIED = 'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
-outputFolderName = 'D:\Nill\code\BART\IED\0_0_new_IED\IED3_summary_unique_channels_RT_IT_BR_with_log\';
+inputFolderName_LFPIED = 'D:\Nill\data\BART\0_0_new_IED_last_500_ms\IED1_find_number_of_IEDs\';
+outputFolderName = 'D:\Nill\code\BART\IED\0_0_new_IED_last_500_ms\IED3_summary_unique_channels_RT_IT_BR_with_log\';
 
 summaryFolder = fullfile(outputFolderName);
 
