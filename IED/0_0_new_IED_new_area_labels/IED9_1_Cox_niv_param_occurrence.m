@@ -21,7 +21,7 @@ end
 
 maximumRT = 20;
 defaultSamplingFrequency = 1000;
-numberOfPermutations = 500;
+numberOfPermutations = 1000;
 numberOfNivCurvePoints = 200;
 randomSeed = 42;
 iedMode = 'occurrence';

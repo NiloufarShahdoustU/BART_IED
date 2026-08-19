@@ -23,7 +23,7 @@ end
 
 maximumRT = 20;
 defaultSamplingFrequency = 1000;
-numberOfPermutations = 500;
+numberOfPermutations = 1000;
 randomSeed = 42;
 iedMode = 'occurrence';
 

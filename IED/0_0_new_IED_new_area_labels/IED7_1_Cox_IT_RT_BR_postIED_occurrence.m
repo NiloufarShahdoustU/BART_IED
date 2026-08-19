@@ -18,7 +18,7 @@ end
 
 samplingFrequency = 1000;
 maximumRT = 20;
-numberOfPermutations = 500;
+numberOfPermutations = 1000;
 randomSeed = 42;
 
 colorIT = [0.847 0.333 0.153];
@@ -42,7 +42,7 @@ configs(2).durationField = 'RTs';
 configs(2).iedField = 'IED_occurance_RT';
 configs(2).bankedOnly = false;
 configs(2).poppedOnly = false;
-configs(2).windowMilliseconds = 500;   % this is 500 here but I also changed it to 1000 on veronica's computer and it's almost the same
+configs(2).windowMilliseconds = 500;   
 configs(2).color = colorRT;
 configs(2).hazardName = 'response';
 
