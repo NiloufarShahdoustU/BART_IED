@@ -10,14 +10,14 @@ close all;
 %% Paths
 
 inputFolderName_LFPIED = ...
-    'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
+    'D:\Nill\data\0_0_new_IED_new_area_labels\IED1_find_number_of_IEDs\';
 
 inputFolderName_modeling = ...
-    'D:\Nill\data\BART\0_0_new_IED\context_modeling\param_recovery_1_modeling\';
+    'D:\Nill\data\param_recovery_1_modeling\';
 
 
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED8_2_Cox_expected_reward_by_brain_areas\';
+    'D:\Nill\code\BART\0_0_new_IED_new_area_labels\IED8_2_Cox_expected_reward_by_brain_areas\';
 
 if ~exist(outputFolderName, 'dir')
     mkdir(outputFolderName);

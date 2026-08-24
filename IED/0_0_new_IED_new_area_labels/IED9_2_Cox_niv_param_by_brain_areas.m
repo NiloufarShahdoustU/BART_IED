@@ -5,11 +5,11 @@
 clear; clc; close all;
 
 inputFolderName = ...
-    'D:\Nill\data\BART\0_0_new_IED\IED1_find_number_of_IEDs\';
+    'D:\Nill\data\0_0_new_IED_new_area_labels\IED1_find_number_of_IEDs\';
 nivParameterFile = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\context_modeling\param_recovery_4_param_recovery\alpha_comparison.csv';
+    'D:\Nill\code\BART\0_0_new_IED_new_area_labels\context_modeling\param_recovery_4_param_recovery\alpha_comparison.csv';
 outputFolderName = ...
-    'D:\Nill\code\BART\IED\0_0_new_IED\IED9_2_Cox_niv_param_by_brain_areas\';
+    'D:\Nill\code\BART\0_0_new_IED_new_area_labels\IED9_2_Cox_niv_param_by_brain_areas\';
 if ~exist(outputFolderName,'dir'), mkdir(outputFolderName); end
 
 settings.postIEDWindowMillisecondsRT = 500;

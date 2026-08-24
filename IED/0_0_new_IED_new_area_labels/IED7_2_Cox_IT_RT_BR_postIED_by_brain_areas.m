@@ -1,4 +1,4 @@
-function IED7_2_Cox_IT_RT_BR_postIED_by_brain_areas
+function IED7_Cox_IT_RT_BR_postIED_by_brain_area_IEDtime_permutation
 
 
 %
@@ -9,7 +9,7 @@ clc;
 close all;
 
 %% Paths
-
+% this was done on veronica's computer
 inputFolderName_LFPIED = ...
     'D:\Nill\data\0_0_new_IED_new_area_labels\IED1_find_number_of_IEDs\';
 
