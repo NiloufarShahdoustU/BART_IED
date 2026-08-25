@@ -686,6 +686,13 @@ function create_hemisphere_bar_figure( ...
         regionalSummary, regionalSummary_wHemisphere, ...
         metricField, yAxisLabel, mainTitle, outputFile)
 
+    %% Keep only regions covered by at least 10 participants in TOTAL
+
+    keepRegion = ...
+        regionalSummary.TotalParticipantsWithElectrodes >= 10;
+
+    regionalSummary = regionalSummary(keepRegion, :);
+
     %% Sort regions using the TOTAL counts only
 
     totalValuesUnsorted = regionalSummary.(metricField);

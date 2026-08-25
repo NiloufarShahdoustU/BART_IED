@@ -877,6 +877,10 @@ function plotForestPanel(ax, coxResults, config)
     significant = pValues < 0.05;
 
     xlim(ax, [0.8 * min([low; 1]), 1.25 * max([high; 1])]);
+    tickLabels = compose('%.6f', xticks(ax));
+    tickLabels = regexprep(tickLabels, '0+$', '');
+    tickLabels = regexprep(tickLabels, '\.$', '');
+    xticklabels(ax, tickLabels);
     ylim(ax, [0.5 height(coxResults) + 0.5]);
 
     for row = 1:height(coxResults)
