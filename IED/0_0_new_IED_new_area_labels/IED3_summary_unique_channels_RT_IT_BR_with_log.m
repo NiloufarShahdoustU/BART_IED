@@ -1,4 +1,4 @@
-% summarize number of unique ied channels per trial vs rt, it, br, and pr
+% summarize duration-normalized unique ied-channel rate per trial vs rt, it, br, and pr
 
 
 % Author: Nill
@@ -16,8 +16,8 @@ if ~exist(summaryFolder, 'dir')
     mkdir(summaryFolder);
 end
 
-% BR analysis uses only the number of unique IED channels during IT.
-% Trials with 0 IT-period unique IED channels are included in the BR analysis.
+% BR/PR analysis uses the number of unique IED channels during IT divided by IT.
+% Trials with 0 IT-period unique IED channels are included in the analysis.
 
 fileList = dir(fullfile(inputFolderName_LFPIED, '*.LFPIED.mat'));
 
@@ -60,25 +60,33 @@ for pt = 1:length(fileList)
     BRs = BRs(1:nTrials);
 
     nonControlTrials = isControl == 0;
-    validRT_10sec = isfinite(RTs) & RTs <= 20;
+    validRT_20sec = isfinite(RTs) & RTs <= 20;
     validBR = isfinite(BRs) & (BRs == 0 | BRs == 1);
 
     nUniqueChans_RT = countUniqueChannelsPerTrial(LFPIED, 'IED_occurance_RT', nTrials);
     nUniqueChans_IT = countUniqueChannelsPerTrial(LFPIED, 'IED_occurance_IT', nTrials);
 
-    % For BR, use only the unique IED channel count during IT.
-    nUniqueChans_BR = nUniqueChans_IT;
-    xMeasureBR = 'Unique IED channels during IT';
+    % Normalize by the relevant interval duration. RT and IT are in seconds,
+    % so these predictors are unique IED-channel rates (channels/second).
+    % Nonfinite rates from missing, zero, or negative durations are excluded.
+    uniqueChanRate_RT = nUniqueChans_RT ./ RTs;
+    uniqueChanRate_IT = nUniqueChans_IT ./ ITs;
 
-    keep_chans_RT = nonControlTrials & validRT_10sec & isfinite(RTs) & RTs > 0 & nUniqueChans_RT >= 0;
-    keep_chans_IT = nonControlTrials & validRT_10sec & isfinite(ITs) & ITs > 0 & nUniqueChans_IT >= 0;
-    keep_chans_BR = nonControlTrials & validRT_10sec & validBR & ...
-        isfinite(ITs) & ITs > 0 & nUniqueChans_BR >= 0;
+    % For BR and PR, normalize the IT unique-channel count by IT duration.
+    uniqueChanRate_BR = uniqueChanRate_IT;
+    xMeasureBR = 'Unique IED-channel rate during IT (channels/second)';
+
+    keep_chans_RT = nonControlTrials & validRT_20sec & isfinite(RTs) & RTs > 0 & ...
+        isfinite(uniqueChanRate_RT) & uniqueChanRate_RT >= 0;
+    keep_chans_IT = nonControlTrials & validRT_20sec & isfinite(ITs) & ITs > 0 & ...
+        isfinite(uniqueChanRate_IT) & uniqueChanRate_IT >= 0;
+    keep_chans_BR = nonControlTrials & validRT_20sec & validBR & ...
+        isfinite(ITs) & ITs > 0 & isfinite(uniqueChanRate_BR) & uniqueChanRate_BR >= 0;
 
     panels = {
-        'Unique_channels_vs_RT', 'Unique IED channels during RT', 'RT', nUniqueChans_RT, RTs, keep_chans_RT, zeros(nTrials, 1);
-        'Unique_channels_vs_IT', 'Unique IED channels during IT', 'IT', nUniqueChans_IT, ITs, keep_chans_IT, zeros(nTrials, 1);
-        'Unique_channels_vs_BR', xMeasureBR, 'BR', nUniqueChans_BR, BRs, keep_chans_BR, ITs
+        'Unique_channel_rate_vs_RT', 'Unique IED-channel rate during RT (channels/second)', 'RT', uniqueChanRate_RT, RTs, keep_chans_RT, zeros(nTrials, 1);
+        'Unique_channel_rate_vs_IT', 'Unique IED-channel rate during IT (channels/second)', 'IT', uniqueChanRate_IT, ITs, keep_chans_IT, zeros(nTrials, 1);
+        'Unique_channel_rate_vs_BR', xMeasureBR, 'BR', uniqueChanRate_BR, BRs, keep_chans_BR, ITs
     };
 
     for pp = 1:size(panels, 1)
@@ -149,11 +157,11 @@ for pt = 1:length(fileList)
 
         perPatientResults = [perPatientResults; newPerPatientRow];
 
-        % pr = 1 - br, so the unique-channel effect has the opposite sign
+        % pr = 1 - br, so the unique-channel-rate effect has the opposite sign
         if string(yMeasure) == "BR"
 
             newPRRow = newPerPatientRow;
-            newPRRow.comparison = "Unique_channels_vs_PR";
+            newPRRow.comparison = "Unique_channel_rate_vs_PR";
             newPRRow.yMeasure = "PR";
             newPRRow.yMean = mean(1 - y, 'omitnan');
             newPRRow.yMedian = median(1 - y, 'omitnan');
@@ -653,7 +661,7 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
                 'yMeasure', ...
                 'nPatients', ...
                 'nTrialPoints', ...
-                'beta_log10UniqueChannelsPlus1', ...
+                'beta_log10UniqueChannelRatePlus1', ...
                 'SE', ...
                 'tStat', ...
                 'pValue', ...
@@ -671,9 +679,9 @@ function groupMixedEffectsResults = runGroupMixedEffects(trialLevelData)
         if isBR
 
             prRow = newRow;
-            prRow.comparison = "Unique_channels_vs_PR";
+            prRow.comparison = "Unique_channel_rate_vs_PR";
             prRow.yMeasure = "PR";
-            prRow.beta_log10UniqueChannelsPlus1 = -beta;
+            prRow.beta_log10UniqueChannelRatePlus1 = -beta;
             prRow.SE = se;
             prRow.tStat = -tStat;
             prRow.pValue = pValue;
@@ -794,8 +802,8 @@ function plotSummaryBoxplots(perPatientResults, summaryPDF, groupMixedEffectsRes
         comparisonOrder, ...
         colors, ...
         'modelSlope', ...
-        sprintf(['Model slope\nRT/IT: seconds per log10(unique IED channels + 1); ' ...
-        'BR/PR: adjusted log-odds per log10(unique IED channels + 1)']), ...
+        sprintf(['Model slope\nRT/IT: seconds per log10(unique IED-channel rate + 1); ' ...
+        'BR/PR: adjusted log-odds per log10(unique IED-channel rate + 1)']), ...
         'Per-patient model slope', ...
         groupMixedEffectsResults, ...
         'pValue_FDR');

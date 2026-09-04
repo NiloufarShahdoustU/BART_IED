@@ -104,8 +104,8 @@ for pt = 1:length(fileList)
         isfinite(PRs) & (PRs == 0 | PRs == 1);
 
     % Means per participant
-    thisMeanRT = mean(RTs(validTrials_RT), 'omitnan');
-    thisMeanIT = mean(ITs(validTrials_IT), 'omitnan');
+    thisMeanRT = median(RTs(validTrials_RT), 'omitnan');
+    thisMeanIT = median(ITs(validTrials_IT), 'omitnan');
     thisMeanBR = mean(BRs(validTrials_BR), 'omitnan');
     thisMeanPR = mean(PRs(validTrials_PR), 'omitnan');
 
@@ -199,7 +199,7 @@ plotSingleScatterBox( ...
     colorRT, ...
     'RT', ...
     'time (s)', ...
-    'mean RT');
+    'median RT');
 
 % Subplot 2: IT
 axes(ax2);
@@ -209,7 +209,7 @@ plotSingleScatterBox( ...
     colorIT, ...
     'IT', ...
     'time (s)', ...
-    'mean IT');
+    'median IT');
 
 % Subplot 3: BR
 axes(ax3);

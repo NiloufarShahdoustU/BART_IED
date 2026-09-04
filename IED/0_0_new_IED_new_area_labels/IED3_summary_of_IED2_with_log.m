@@ -1,4 +1,4 @@
-% summarize ied count per trial vs rt, it, bank, and pop
+% summarize duration-normalized ied rate per trial vs rt, it, bank, and pop
 % author: nill
 
 clear;
@@ -47,15 +47,23 @@ for pt = 1:length(files)
     nIED_RT = accumarray(RTtrials, 1, [nTrials 1]);
     nIED_IT = accumarray(ITtrials, 1, [nTrials 1]);
 
+    % Normalize the IED counts by the duration of the relevant interval.
+    % RT and IT are in seconds, so these variables are IED rates (IEDs/second).
+    % Invalid rates caused by missing, zero, or negative durations are removed
+    % by the keep criteria below.
+    IEDrate_RT = nIED_RT ./ RT;
+    IEDrate_IT = nIED_IT ./ IT;
+
     % fit three unique models
     % the pr effect is created by reversing the br outcome
-    % the br model also controls for it duration
-    xData = {nIED_RT, nIED_IT, nIED_IT};
+    % the br/pr predictor is also normalized by it duration
+    % the br model continues to control for it duration
+    xData = {IEDrate_RT, IEDrate_IT, IEDrate_IT};
     yData = {RT, IT, BR};
-    comparisonBase = ["IED_count_vs_RT", "IED_count_vs_IT", "IED_count_vs_BR"];
-    xNameBase = ["IED count during RT", ...
-        "IED count during IT", ...
-        "IED count during IT"];
+    comparisonBase = ["IED_rate_vs_RT", "IED_rate_vs_IT", "IED_rate_vs_BR"];
+    xNameBase = ["IED rate during RT (IEDs/second)", ...
+        "IED rate during IT (IEDs/second)", ...
+        "IED rate during IT (IEDs/second)"];
     yNameBase = ["RT", "IT", "BR"];
 
     for k = 1:3
@@ -133,7 +141,7 @@ for pt = 1:length(files)
         % pr = 1 - br, so its ied effect has the opposite sign
         if k == 3
             prRow = newRow;
-            prRow.comparison = "IED_count_vs_PR";
+            prRow.comparison = "IED_rate_vs_PR";
             prRow.yMeasure = "PR";
             prRow.yMean = mean(1 - y);
             prRow.yMedian = median(1 - y);
@@ -168,12 +176,12 @@ writetable(perPatientResults, fullfile(outputFolder, 'per_patient_results.csv'))
 %% Group summary of the patient slopes
 
 groupSlopeSummary = table();
-comparison = ["IED_count_vs_RT", "IED_count_vs_IT", ...
-    "IED_count_vs_BR", "IED_count_vs_PR"];
-xName = ["IED count during RT", ...
-    "IED count during IT", ...
-    "IED count during IT", ...
-    "IED count during IT"];
+comparison = ["IED_rate_vs_RT", "IED_rate_vs_IT", ...
+    "IED_rate_vs_BR", "IED_rate_vs_PR"];
+xName = ["IED rate during RT (IEDs/second)", ...
+    "IED rate during IT (IEDs/second)", ...
+    "IED rate during IT (IEDs/second)", ...
+    "IED rate during IT (IEDs/second)"];
 yName = ["RT", "IT", "BR", "PR"];
 
 for k = 1:4
@@ -287,7 +295,7 @@ for k = 1:3
         length(unique(rows.patientID)), height(rows), beta, SE, tStat, pValue, ...
         CILow, CIHigh, oddsRatio, oddsLow, oddsHigh, modelType, ...
         'VariableNames', {'comparison', 'xMeasure', 'yMeasure', 'nPatients', ...
-        'nTrialPoints', 'beta_log10IEDcountPlus1', 'SE', 'tStat', 'pValue', ...
+        'nTrialPoints', 'beta_log10IEDratePlus1', 'SE', 'tStat', 'pValue', ...
         'CILow', 'CIHigh', 'oddsRatio', 'oddsRatioCILow', 'oddsRatioCIHigh', 'modelType'});
 
     groupMixedEffectsResults = [groupMixedEffectsResults; newRow];
@@ -295,9 +303,9 @@ for k = 1:3
     % add the same br result with pop coded as the event
     if k == 3
         prRow = newRow;
-        prRow.comparison = "IED_count_vs_PR";
+        prRow.comparison = "IED_rate_vs_PR";
         prRow.yMeasure = "PR";
-        prRow.beta_log10IEDcountPlus1 = -beta;
+        prRow.beta_log10IEDratePlus1 = -beta;
         prRow.SE = SE;
         prRow.tStat = -tStat;
         prRow.pValue = pValue;
@@ -397,8 +405,8 @@ for k = 1:4
         'HorizontalAlignment', 'center', 'FontSize', 18, 'FontWeight', 'bold');
 end
 
-ylabel(sprintf(['Model slope\nRT/IT: seconds per log10(IED count + 1); ' ...
-    'BR/PR: adjusted log-odds per log10(IED count + 1)']), ...
+ylabel(sprintf(['Model slope\nRT/IT: seconds per log10(IED rate + 1); ' ...
+    'BR/PR: adjusted log-odds per log10(IED rate + 1)']), ...
     'FontSize', 12, 'FontWeight', 'bold');
 title('Per-patient IED effects', ...
     'FontSize', 13, 'FontWeight', 'bold');
