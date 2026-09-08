@@ -456,31 +456,64 @@ writetable( ...
     nTrialsSummary, ...
     fullfile(outputFolderName, 'nTrials_summary.csv'));
 
-%% create and save 3 x 1 bar-plot PDFs
+%% Left-versus-right proportion tests with BH-FDR correction
 
-create_hemisphere_bar_figure( ...
+% Participant denominators are the numbers of unique participants with at
+% least one retained channel in the corresponding hemisphere. Channel and
+% IED denominators are the total retained channel and IED counts in that
+% hemisphere. For every region, the two-proportion z-test compares:
+%
+%        left regional count / left hemisphere denominator
+%    vs  right regional count / right hemisphere denominator
+%
+% BH-FDR correction is performed separately for participants, channels,
+% and IEDs across all plotted regions.
+
+leftChannelRows = endsWith(channelTable_wHemisphere.Region, "_L");
+rightChannelRows = endsWith(channelTable_wHemisphere.Region, "_R");
+leftIEDRows = endsWith(IEDTable_wHemisphere.Region, "_L");
+rightIEDRows = endsWith(IEDTable_wHemisphere.Region, "_R");
+
+participantDenominators = [ ...
+    length(unique(channelTable_wHemisphere.ParticipantID(leftChannelRows))), ...
+    length(unique(channelTable_wHemisphere.ParticipantID(rightChannelRows)))];
+
+channelDenominators = [sum(leftChannelRows), sum(rightChannelRows)];
+IEDDenominators = [sum(leftIEDRows), sum(rightIEDRows)];
+
+participantStats = calculate_hemisphere_proportion_stats( ...
+    regionalSummary, regional_wHemisphere_summary, ...
+    'TotalParticipantsWithElectrodes', 'Participants', ...
+    participantDenominators);
+
+channelStats = calculate_hemisphere_proportion_stats( ...
+    regionalSummary, regional_wHemisphere_summary, ...
+    'TotalChannels', 'Channels', channelDenominators);
+
+IEDStats = calculate_hemisphere_proportion_stats( ...
+    regionalSummary, regional_wHemisphere_summary, ...
+    'TotalIEDs', 'IEDs', IEDDenominators);
+
+hemisphereProportionStats = [ ...
+    participantStats; channelStats; IEDStats];
+
+writetable( ...
+    hemisphereProportionStats, ...
+    fullfile(outputFolderName, ...
+    'left_right_proportion_tests_BH_FDR.csv'));
+
+%% Create one 6 x 1 figure
+
+% Rows 1-2: participants (overall, then left/right)
+% Rows 3-4: channels     (overall, then left/right)
+% Rows 5-6: IEDs         (overall, then left/right)
+
+create_six_panel_hemisphere_figure( ...
     regionalSummary, ...
     regional_wHemisphere_summary, ...
-    'TotalIEDs', ...
-    'Number of IEDs', ...
-    'IED counts by region and hemisphere', ...
-    fullfile(outputFolderName, 'IEDs.pdf'));
-
-create_hemisphere_bar_figure( ...
-    regionalSummary, ...
-    regional_wHemisphere_summary, ...
-    'TotalParticipantsWithElectrodes', ...
-    'Number of participants', ...
-    'Participant counts by region and hemisphere', ...
-    fullfile(outputFolderName, 'pts.pdf'));
-
-create_hemisphere_bar_figure( ...
-    regionalSummary, ...
-    regional_wHemisphere_summary, ...
-    'TotalChannels', ...
-    'Number of channels', ...
-    'Channel counts by region and hemisphere', ...
-    fullfile(outputFolderName, 'chans.pdf'));
+    participantStats, channelStats, IEDStats, ...
+    fullfile(outputFolderName, ...
+    'participants_channels_IEDs_6x1.pdf'));
 
 disp(' ');
 disp('Saved:');
@@ -488,9 +521,10 @@ disp(fullfile(outputFolderName, 'regional_summary_table.csv'));
 disp(fullfile(outputFolderName, ...
     'regional_wHemisphere_summary_table.csv'));
 disp(fullfile(outputFolderName, 'nTrials_summary.csv'));
-disp(fullfile(outputFolderName, 'IEDs.pdf'));
-disp(fullfile(outputFolderName, 'pts.pdf'));
-disp(fullfile(outputFolderName, 'chans.pdf'));
+disp(fullfile(outputFolderName, ...
+    'left_right_proportion_tests_BH_FDR.csv'));
+disp(fullfile(outputFolderName, ...
+    'participants_channels_IEDs_6x1.pdf'));
 
 %% local functions
 
@@ -682,138 +716,425 @@ function electrodeNames = get_electrode_names(chanLabels)
 
 end
 
-function create_hemisphere_bar_figure( ...
+function statsTable = calculate_hemisphere_proportion_stats( ...
         regionalSummary, regionalSummary_wHemisphere, ...
-        metricField, yAxisLabel, mainTitle, outputFile)
+        metricField, metricName, denominators)
 
-    %% Keep only regions covered by at least 10 participants in TOTAL
+    %% Test only the regions displayed in the figure
 
     keepRegion = ...
         regionalSummary.TotalParticipantsWithElectrodes >= 10;
+    regions = regionalSummary.Region(keepRegion);
+    nRegions = length(regions);
 
-    regionalSummary = regionalSummary(keepRegion, :);
+    leftCount = zeros(nRegions, 1);
+    rightCount = zeros(nRegions, 1);
+    leftDenominator = repmat(denominators(1), nRegions, 1);
+    rightDenominator = repmat(denominators(2), nRegions, 1);
+    leftProportion = NaN(nRegions, 1);
+    rightProportion = NaN(nRegions, 1);
+    zStatistic = NaN(nRegions, 1);
+    pValue = NaN(nRegions, 1);
 
-    %% Sort regions using the TOTAL counts only
-
-    totalValuesUnsorted = regionalSummary.(metricField);
-
-    [totalValues, sortIndex] = sort( ...
-        totalValuesUnsorted, 'descend');
-
-    orderedRegions = regionalSummary.Region(sortIndex);
-    nRegions = length(orderedRegions);
-
-    %% Match left and right values to the TOTAL region order
-
-    % NaN is intentional: when a left or right region does not exist,
-    % MATLAB leaves that bar position empty.
-    leftValues = NaN(nRegions, 1);
-    rightValues = NaN(nRegions, 1);
-
-    hemisphereMetricValues = ...
-        regionalSummary_wHemisphere.(metricField);
+    hemisphereValues = regionalSummary_wHemisphere.(metricField);
 
     for rr = 1:nRegions
 
-        leftRegion = orderedRegions(rr) + "_L";
-        rightRegion = orderedRegions(rr) + "_R";
-
         leftRow = find( ...
-            regionalSummary_wHemisphere.Region == leftRegion, 1);
-
+            regionalSummary_wHemisphere.Region == regions(rr) + "_L", 1);
         rightRow = find( ...
-            regionalSummary_wHemisphere.Region == rightRegion, 1);
+            regionalSummary_wHemisphere.Region == regions(rr) + "_R", 1);
 
         if ~isempty(leftRow)
-            leftValues(rr) = hemisphereMetricValues(leftRow);
+            leftCount(rr) = hemisphereValues(leftRow);
         end
 
         if ~isempty(rightRow)
-            rightValues(rr) = hemisphereMetricValues(rightRow);
+            rightCount(rr) = hemisphereValues(rightRow);
+        end
+
+        nLeft = leftDenominator(rr);
+        nRight = rightDenominator(rr);
+
+        if nLeft <= 0 || nRight <= 0
+            continue;
+        end
+
+        leftProportion(rr) = leftCount(rr) / nLeft;
+        rightProportion(rr) = rightCount(rr) / nRight;
+
+        pooledProportion = ...
+            (leftCount(rr) + rightCount(rr)) / (nLeft + nRight);
+
+        standardError = sqrt( ...
+            pooledProportion * (1 - pooledProportion) * ...
+            (1 / nLeft + 1 / nRight));
+
+        if standardError > 0
+            zStatistic(rr) = ...
+                (leftProportion(rr) - rightProportion(rr)) / ...
+                standardError;
+
+            % Two-sided standard-normal p-value. erfc avoids requiring
+            % the Statistics and Machine Learning Toolbox for normcdf.
+            pValue(rr) = erfc(abs(zStatistic(rr)) / sqrt(2));
+        else
+            zStatistic(rr) = 0;
+            pValue(rr) = 1;
         end
 
     end
 
-    %% Set each subplot y-axis limit based on its own tallest bar
+    qValue = benjamini_hochberg(pValue);
+    significantFDR = qValue < 0.05;
+    metricColumn = repmat(string(metricName), nRegions, 1);
 
-    subplotValues = {totalValues, leftValues, rightValues};
-    yMaximum = ones(3, 1);
+    statsTable = table( ...
+        metricColumn, regions, ...
+        leftCount, rightCount, ...
+        leftDenominator, rightDenominator, ...
+        leftProportion, rightProportion, ...
+        zStatistic, pValue, qValue, significantFDR, ...
+        'VariableNames', { ...
+        'Metric', 'Region', ...
+        'LeftCount', 'RightCount', ...
+        'LeftDenominator', 'RightDenominator', ...
+        'LeftProportion', 'RightProportion', ...
+        'ZStatistic', 'PValue', 'QValue_BH_FDR', ...
+        'Significant_BH_FDR_0_05'});
 
-    for pp = 1:3
+end
 
-        finiteValues = subplotValues{pp}( ...
-            isfinite(subplotValues{pp}));
+function qValues = benjamini_hochberg(pValues)
 
-        if ~isempty(finiteValues) && max(finiteValues) > 0
-            largestValue = max(finiteValues);
-            yMaximum(pp) = ...
-                largestValue + max(1, 0.12 * largestValue);
-        end
+    %% Benjamini-Hochberg FDR-adjusted p-values
 
+    qValues = NaN(size(pValues));
+    validIndex = find(isfinite(pValues));
+
+    if isempty(validIndex)
+        return;
     end
 
-    %% Figure
+    validP = pValues(validIndex);
+    [sortedP, sortIndex] = sort(validP, 'ascend');
+    m = length(sortedP);
+
+    adjustedSorted = sortedP .* m ./ (1:m)';
+
+    % Enforce monotonicity from the largest p-value downward.
+    for ii = m-1:-1:1
+        adjustedSorted(ii) = min( ...
+            adjustedSorted(ii), adjustedSorted(ii + 1));
+    end
+
+    adjustedSorted = min(adjustedSorted, 1);
+
+    unsortedAdjusted = NaN(m, 1);
+    unsortedAdjusted(sortIndex) = adjustedSorted;
+    qValues(validIndex) = unsortedAdjusted;
+
+end
+
+function create_six_panel_hemisphere_figure( ...
+        regionalSummary, regionalSummary_wHemisphere, ...
+        participantStats, channelStats, IEDStats, outputFile)
+
+    %% Keep only regions covered by at least 10 participants in total
+
+    keepRegion = ...
+        regionalSummary.TotalParticipantsWithElectrodes >= 10;
+    plottingSummary = regionalSummary(keepRegion, :);
+
+    %% One common region order, based on decreasing participant coverage
+
+    plottingSummary = sortrows( ...
+        plottingSummary, ...
+        {'TotalParticipantsWithElectrodes', ...
+        'TotalChannels', 'TotalIEDs'}, ...
+        {'descend', 'descend', 'descend'});
+
+    orderedRegions = plottingSummary.Region;
+
+    metricFields = { ...
+        'TotalParticipantsWithElectrodes', ...
+        'TotalChannels', ...
+        'TotalIEDs'};
+
+    metricTitles = { ...
+        'Participants', ...
+        'Channels', ...
+        'IEDs'};
+
+    yAxisLabels = { ...
+        'Number of participants', ...
+        'Number of channels', ...
+        'Number of IEDs'};
+
+    statsTables = {participantStats, channelStats, IEDStats};
+
+    totalColor = [0.35 0.35 0.35];
+    leftColor = [0.204 0.459 0.702];
+    rightColor = [0.847 0.333 0.153];
+
+    % Requested widths: each left/right bar is half as thick as an
+    % overall bar.
+    overallBarWidth = 0.42;
+    hemisphereBarWidth = overallBarWidth / 2;
 
     figureHandle = figure( ...
         'Visible', 'off', ...
         'Color', 'w', ...
-        'Position', [50 50 2400 1700]);
+        'Position', [50 50 700 3300]);
 
-    % Total
-    subplot(3, 1, 1);
-    plot_count_bars( ...
-        orderedRegions, totalValues, ...
-        'Total', yAxisLabel, yMaximum(1), ...
-        [0.35 0.35 0.35]);
+    tiledlayout(6, 1, ...
+        'TileSpacing', 'compact', ...
+        'Padding', 'compact');
 
-    % Left hemisphere
-    subplot(3, 1, 2);
-    plot_count_bars( ...
-        orderedRegions, leftValues, ...
-        'Left hemisphere', yAxisLabel, yMaximum(2), ...
-        [0.204 0.459 0.702]);
+    for mm = 1:3
 
-    % Right hemisphere
-    subplot(3, 1, 3);
-    plot_count_bars( ...
-        orderedRegions, rightValues, ...
-        'Right hemisphere', yAxisLabel, yMaximum(3), ...
-        [0.847 0.333 0.153]);
+        metricField = metricFields{mm};
+        totalValues = get_total_values( ...
+            plottingSummary, orderedRegions, metricField);
 
-    sgtitle(mainTitle, ...
+        [leftValues, rightValues] = get_hemisphere_values( ...
+            regionalSummary_wHemisphere, orderedRegions, metricField);
+
+        thisStats = order_stats_table( ...
+            statsTables{mm}, orderedRegions);
+
+        %% Overall panel
+
+        nexttile;
+        totalMaximum = calculate_y_maximum(totalValues, false);
+
+        plot_overall_bars( ...
+            orderedRegions, totalValues, ...
+            [metricTitles{mm} ' - overall'], ...
+            yAxisLabels{mm}, totalMaximum, ...
+            totalColor, overallBarWidth);
+
+        %% Paired left/right panel
+
+        nexttile;
+        pairedMaximum = calculate_y_maximum( ...
+            [leftValues; rightValues], true);
+
+        plot_paired_hemisphere_bars( ...
+            orderedRegions, leftValues, rightValues, ...
+            thisStats.QValue_BH_FDR, ...
+            thisStats.Significant_BH_FDR_0_05, ...
+            [metricTitles{mm} ' - left versus right'], ...
+            yAxisLabels{mm}, pairedMaximum, ...
+            leftColor, rightColor, hemisphereBarWidth);
+
+    end
+
+    sgtitle( ...
+        {'Regional coverage and IED counts', ...
+        'Left-right statistics: two-proportion z-tests; ' ...
+        'BH-FDR within each metric'}, ...
         'FontSize', 16, ...
         'FontWeight', 'bold', ...
         'Interpreter', 'none');
 
     exportgraphics( ...
-        figureHandle, ...
-        outputFile, ...
-        'ContentType', 'vector');
+        figureHandle, outputFile, 'ContentType', 'vector');
 
     close(figureHandle);
 
 end
 
-function plot_count_bars( ...
-        orderedRegions, values, panelTitle, ...
-        yAxisLabel, yMaximum, barColor)
+function values = get_total_values( ...
+        plottingSummary, orderedRegions, metricField)
+
+    values = NaN(length(orderedRegions), 1);
+
+    for rr = 1:length(orderedRegions)
+        rowIndex = find( ...
+            plottingSummary.Region == orderedRegions(rr), 1);
+        if ~isempty(rowIndex)
+            values(rr) = plottingSummary.(metricField)(rowIndex);
+        end
+    end
+
+end
+
+
+function [leftValues, rightValues] = get_hemisphere_values( ...
+        regionalSummary_wHemisphere, orderedRegions, metricField)
+
+    nRegions = length(orderedRegions);
+    leftValues = NaN(nRegions, 1);
+    rightValues = NaN(nRegions, 1);
+    hemisphereValues = regionalSummary_wHemisphere.(metricField);
+
+    for rr = 1:nRegions
+
+        leftRow = find( ...
+            regionalSummary_wHemisphere.Region == ...
+            orderedRegions(rr) + "_L", 1);
+        rightRow = find( ...
+            regionalSummary_wHemisphere.Region == ...
+            orderedRegions(rr) + "_R", 1);
+
+        if ~isempty(leftRow)
+            leftValues(rr) = hemisphereValues(leftRow);
+        end
+
+        if ~isempty(rightRow)
+            rightValues(rr) = hemisphereValues(rightRow);
+        end
+
+    end
+
+end
+
+function orderedStats = order_stats_table(statsTable, orderedRegions)
+
+    orderedStats = statsTable([],:);
+
+    for rr = 1:length(orderedRegions)
+        rowIndex = find( ...
+            statsTable.Region == orderedRegions(rr), 1);
+        if ~isempty(rowIndex)
+            orderedStats = [orderedStats; statsTable(rowIndex,:)];
+        end
+    end
+
+end
+
+function yMaximum = calculate_y_maximum(values, reserveStatisticsSpace)
+
+    finiteValues = values(isfinite(values));
+
+    if isempty(finiteValues) || max(finiteValues) <= 0
+        yMaximum = 1;
+        return;
+    end
+
+    largestValue = max(finiteValues);
+
+    if reserveStatisticsSpace
+        yMaximum = largestValue + max(1, 0.22 * largestValue);
+    else
+        yMaximum = largestValue + max(1, 0.12 * largestValue);
+    end
+
+end
+
+function plot_overall_bars( ...
+        orderedRegions, values, panelTitle, yAxisLabel, ...
+        yMaximum, barColor, barWidth)
 
     nRegions = length(orderedRegions);
     xPositions = (1:nRegions)';
 
     bar( ...
-        xPositions, ...
-        values, ...
-        0.80, ...
+        xPositions, values, barWidth, ...
         'FaceColor', barColor, ...
         'EdgeColor', 'none');
 
     hold on;
+    add_count_labels(xPositions, values, yMaximum);
+    hold off;
 
-    %% Put the count above every existing bar
+    format_bar_axes( ...
+        orderedRegions, panelTitle, yAxisLabel, yMaximum);
+
+end
+
+function plot_paired_hemisphere_bars( ...
+        orderedRegions, leftValues, rightValues, ...
+        qValues, significantFDR, panelTitle, yAxisLabel, ...
+        yMaximum, leftColor, rightColor, barWidth)
+
+    nRegions = length(orderedRegions);
+    xPositions = (1:nRegions)';
+
+    % The center-to-center separation keeps the two half-width bars next
+    % to each other without overlap.
+    xOffset = barWidth / 2;
+    leftX = xPositions - xOffset;
+    rightX = xPositions + xOffset;
+
+    leftBars = bar( ...
+        leftX, leftValues, barWidth, ...
+        'FaceColor', leftColor, ...
+        'EdgeColor', 'none');
+
+    hold on;
+
+    rightBars = bar( ...
+        rightX, rightValues, barWidth, ...
+        'FaceColor', rightColor, ...
+        'EdgeColor', 'none');
+
+    % add_count_labels(leftX, leftValues, yMaximum);
+    % add_count_labels(rightX, rightValues, yMaximum);
+
+    %% Mark significant FDR-adjusted left-right comparisons
+
+    for rr = 1:nRegions
+
+        if significantFDR(rr) && isfinite(qValues(rr))
+
+            pairValues = [leftValues(rr), rightValues(rr)];
+            pairValues = pairValues(isfinite(pairValues));
+
+            if isempty(pairValues)
+                continue;
+            end
+
+            markerY = max(pairValues) + 0.09 * yMaximum;
+            bracketHeight = 0.018 * yMaximum;
+
+            plot( ...
+                [leftX(rr), leftX(rr), rightX(rr), rightX(rr)], ...
+                [markerY - bracketHeight, markerY, ...
+                markerY, markerY - bracketHeight], ...
+                'k-', 'LineWidth', 0.8);
+
+            if qValues(rr) < 0.001
+                significanceLabel = '***';
+            elseif qValues(rr) < 0.01
+                significanceLabel = '**';
+            else
+                significanceLabel = '*';
+            end
+
+            text( ...
+                xPositions(rr), markerY + 0.015 * yMaximum, ...
+                significanceLabel, ...
+                'HorizontalAlignment', 'center', ...
+                'VerticalAlignment', 'bottom', ...
+                'FontSize', 8, ...
+                'FontWeight', 'bold', ...
+                'Color', [0.05 0.05 0.05], ...
+                'Clipping', 'off');
+
+        end
+
+    end
+
+    legend( ...
+        [leftBars, rightBars], ...
+        {'Left', 'Right'}, ...
+        'Location', 'northeast', ...
+        'Box', 'off', ...
+        'FontSize', 8);
+
+    hold off;
+
+    format_bar_axes( ...
+        orderedRegions, panelTitle, yAxisLabel, yMaximum);
+
+end
+
+function add_count_labels(xPositions, values, yMaximum)
 
     validBars = isfinite(values);
-    textOffset = 0.015 * yMaximum;
+    textOffset = 0.012 * yMaximum;
 
     text( ...
         xPositions(validBars), ...
@@ -821,21 +1142,27 @@ function plot_count_bars( ...
         compose('%.0f', values(validBars)), ...
         'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'bottom', ...
-        'FontSize', 7, ...
+        'FontSize', 6.5, ...
         'Color', [0.1 0.1 0.1], ...
         'Clipping', 'off');
 
-    hold off;
+end
 
-    xlim([0.25, nRegions + 0.75]);
+function format_bar_axes( ...
+        orderedRegions, panelTitle, yAxisLabel, yMaximum)
+
+    nRegions = length(orderedRegions);
+    xPositions = (1:nRegions)';
+
+    xlim([0.45, nRegions + 0.55]);
     ylim([0, yMaximum]);
 
     xticks(xPositions);
     xticklabels(orderedRegions);
     xtickangle(0);
 
-    ylabel(yAxisLabel, 'FontSize', 11);
-    title(panelTitle, 'FontSize', 13, 'FontWeight', 'bold');
+    ylabel(yAxisLabel, 'FontSize', 10);
+    title(panelTitle, 'FontSize', 12, 'FontWeight', 'bold');
 
     set(gca, ...
         'FontSize', 7, ...
@@ -844,8 +1171,5 @@ function plot_count_bars( ...
         'TickLength', [0.003 0.003], ...
         'Box', 'off', ...
         'LineWidth', 1);
-
-    % grid on;
-    % set(gca, 'XGrid', 'off', 'YGrid', 'on');
 
 end

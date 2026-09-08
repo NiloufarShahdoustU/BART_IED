@@ -1,0 +1,56 @@
+%% create regional summary tables, with and without hemisphere
+
+clear;
+clc;
+close all;
+
+%% paths
+
+inputFolderName_LFPIED = ...
+    'D:\Nill\data\BART\0_0_new_IED_new_area_labels\IED1_find_number_of_IEDs\';
+
+outputFolderName = ...
+    'D:\Nill\code\BART\IED\0_0_new_IED_new_area_labels\IED0_summary_table\';
+
+if ~exist(outputFolderName, 'dir')
+    mkdir(outputFolderName);
+end
+
+%% settings
+
+fileList = dir(fullfile(inputFolderName_LFPIED, '*.LFPIED.mat'));
+
+[~, sortIndex] = sort({fileList.name});
+fileList = fileList(sortIndex);
+
+
+RTs_10_counts = zeros(pt);
+RTs_20_counts = length(RTs_20);
+
+%% loop over participants
+
+for pt = 1:length(fileList)
+
+    fileName = fileList(pt).name;
+    fileNameParts = strsplit(fileName, '.');
+    ptID = string(fileNameParts{1});
+
+    disp(' ');
+    disp(['Processing patient ID: ' char(ptID)]);
+
+    loadedData = load(fullfile(inputFolderName_LFPIED, fileName));
+
+    if ~isfield(loadedData, 'LFPIED')
+        disp('No LFPIED variable found, skipped');
+        continue;
+    end
+
+    LFPIED = loadedData.LFPIED;
+    RTs = LFPIED.RTs;
+
+    RTs_10 = RTs(RTs>10);
+    RTs_20 = RTs(RTs>20);
+
+    RTs_10_counts = length(RTs_10);
+    RTs_20_counts = length(RTs_20);
+end
