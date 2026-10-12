@@ -1,60 +1,68 @@
-%% this is with hilbert transfrom
-% in this version I am using minPeakProminent instead of minPeakHeight
-% this one is used for the 1000 of sampling rate
-
-
 function [IEDdata] = detectIEDs_single_array_v5(data, Fo)
-    % DETECTIEDS finds interictal epileptiform discharges (IEDs) in a single EEG channel
-    % data: A vector representing the EEG signal
-    % Fo: Original sampling rate of the data
-    
-    Fs = Fo; % Sampling rate for processing
-    
-    % Define the desired frequency range
-    freqRange = [5 25]; % Frequency range for bandpass filter
-    smoothing_var = 10;
-    
-    % Design the bandpass filter
-    [b, a] = butter(4, freqRange / (Fs / 2), 'bandpass');
-    
-    % Apply bandpass filtering
-    filteredData = filtfilt(b, a, data);
-    
-    % Apply Hilbert transform
-    hilbertTransform = abs(hilbert(filteredData));
-    
-    % Downsampling to Fs
-    dataFs = resample(hilbertTransform, Fs, Fo);
-    
-    % Compute the smoothed signal for peak detection
-    smoothedData = smooth(abs(dataFs), Fs / smoothing_var);
-    
-    % Determine the maximum amplitude for reference
-    maxValue = max(smoothedData);
-    
-    % Set MinPeakProminence based on a percentage of the maximum value
-    minPeakProminence = 0.6 * maxValue; % For example, 60% of the max the bigger the more sensitive
-    
-    % Find peaks based on prominence
-    [~, locs] = findpeaks(smoothedData, 'MinPeakProminence', minPeakProminence);
-    
-    % Initialize variables for filtered peaks
-    filteredLocs = [];
-    lastAcceptedLoc = 0;
-    
-    minSamplesApart = 0.250 * Fs; % Minimum distance between peaks 250ms
-    
-    % Filter peaks based on the distance criterion
-    for i = 1:length(locs)
-        if (locs(i) - lastAcceptedLoc) >= minSamplesApart
-            filteredLocs(end+1) = locs(i); % Accept the current location
-            lastAcceptedLoc = locs(i); % Update the last accepted location
-        end
+% DETECTIEDS_SINGLE_ARRAY_V5
+% Detect IEDs using Hilbert envelope for detection
+% BUT save ONLY true LFP waveform peaks
+%
+% data : raw LFP (1D)
+% Fo   : sampling rate (Hz)
+
+Fs = Fo;
+
+%% ---------------- parameters ----------------
+freqRange    = [5 25];
+smoothingVar = 10;
+minPeakFrac  = 0.6;          % 60% of max envelope
+minISI       = 0.250;        % 250 ms
+searchWinSec = 0.050;        % ±50 ms for true peak
+
+%% ---------------- bandpass ----------------
+[b, a] = butter(4, freqRange/(Fs/2), 'bandpass');
+filteredData = filtfilt(b, a, data);
+
+%% ---------------- envelope detection (INTERNAL ONLY) ----------------
+env = abs(hilbert(filteredData));
+envSmooth = smooth(env, Fs/smoothingVar);
+
+minPeakProminence = minPeakFrac * max(envSmooth);
+[~, locs] = findpeaks(envSmooth, ...
+    'MinPeakProminence', minPeakProminence);
+
+%% ---------------- enforce refractory ----------------
+minSamplesApart = round(minISI * Fs);
+
+keep = true(size(locs));
+lastLoc = -inf;
+
+for i = 1:length(locs)
+    if locs(i) - lastLoc < minSamplesApart
+        keep(i) = false;
+    else
+        lastLoc = locs(i);
     end
-    
-    % Update IEDdata structure with filtered locations
-    IEDdata.foundPeaks(1).locs = filteredLocs;
-    IEDdata.detections(1).times = filteredLocs / Fs; % Convert locations to time in seconds
+end
+
+locs = locs(keep);
+
+%% ---------------- TRUE LFP PEAK REFINEMENT ----------------
+searchWin = round(searchWinSec * Fs);
+truePeaks = zeros(size(locs));
+
+for i = 1:length(locs)
+
+    c = locs(i);
+    i1 = max(1, c - searchWin);
+    i2 = min(length(filteredData), c + searchWin);
+
+    seg = filteredData(i1:i2);
+
+    % TRUE waveform peak (absolute)
+    [~, idx] = max(abs(seg));
+    truePeaks(i) = i1 + idx - 1;
 
 end
 
+%% ---------------- OUTPUT (ONLY TRUE PEAKS) ----------------
+IEDdata.foundPeaks(1).locs  = truePeaks;
+IEDdata.detections(1).times = truePeaks / Fs;
+
+end
